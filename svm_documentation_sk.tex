@@ -1,0 +1,591 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Kódovanie a jazyk ─────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[slovak]{babel}
+
+% ── Písmo ─────────────────────────────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Matematika ────────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+
+% ── Grafika a tabuľky ─────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+
+% ── Formátovanie ──────────────────────────────────────────────────────────────
+\usepackage{geometry}
+\geometry{top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+
+% ── Zdrojový kód ──────────────────────────────────────────────────────────────
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstdefinelanguage{JavaScript}{
+  keywords={function,var,let,const,return,if,else,for,while,new,this,class,true,false,null},
+  keywordstyle=\bfseries,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  string=[b]",
+  morestring=[b]',
+  sensitive=true
+}
+
+\lstset{
+  language=JavaScript,
+  basicstyle=\ttfamily\small,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{black!30},
+  backgroundcolor=\color{black!4},
+  breaklines=true,
+  breakatwhitespace=true,
+  numbers=left,
+  numberstyle=\tiny\color{black!40},
+  numbersep=6pt,
+  xleftmargin=1.5em,
+  captionpos=b,
+  showstringspaces=false
+}
+
+% ── Obsah, hypertextové prepojenia ────────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=black,citecolor=black}
+
+% ── Pomocné definície ─────────────────────────────────────────────────────────
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\gitrepo}{https://github.com/tvoje-meno/svm-projekt}
+
+% =============================================================================
+\begin{document}
+
+% ── Titulná strana ────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\LARGE\bfseries Dokumentácia projektu\par}
+  \vspace{0.6cm}
+  {\Huge\bfseries Metóda podporných vektorov\\[0.3em]
+   \large (Support Vector Machine -- SVM)\par}
+  \vspace{1.2cm}
+  {\large Predmet: Strojové učenie\par}
+  \vspace{0.4cm}
+  {\large TUKE FEI - ÚUI - 2025/2026\par}
+  \vspace{0.8cm}
+  {\large Autor: Samuel Štefán\par}
+  \vspace{0.3cm}
+  {\small Repozitár: \url{https://github.com/SamuelStefan01/ml-svm-website}\par}
+  \vfill
+  \rule{\linewidth}{0.5pt}\\[0.4em]
+  {\small Interaktívna webová aplikácia implementovaná v~HTML/CSS/JavaScript}
+\end{titlepage}
+
+% ── Obsah ─────────────────────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Úvod a ciele projektu}
+% =============================================================================
+
+Cieľom projektu je interaktívna webová aplikácia, ktorá komplexne prezentuje
+algoritmus \textbf{Support Vector Machine (SVM)} -- metódu podporných vektorov.
+Aplikácia pokrýva teoretický základ, matematickú formuláciu, vizualizáciu
+rozhodovacej hranice, vyhodnotenie metrík efektívnosti a porovnanie s~inými
+klasifikačnými algoritmami.
+
+Projekt je implementovaný ako~jediný HTML súbor (\texttt{svm\_v4.html})
+bez externých závislostí okrem knižnice Chart.js (verzia 4.4.1, načítaná z~CDN).
+Algoritmus SMO (Sequential Minimal Optimization) je napísaný od základov
+v~JavaScripte bez použitia externých strojového učenia knižníc.
+
+\subsection*{Štruktúra aplikácie}
+
+Aplikácia je rozdelená do piatich záložiek:
+\begin{enumerate}
+  \item \textbf{Teória SVM} -- matematická formulácia, geometria marginu,
+        stratégie viactriednej klasifikácie (OvO/OvR)
+  \item \textbf{Interaktívna demo} -- klikateľné plátno, výber jadra
+        a~parametrov, vizualizácia podporných vektorov a~váhového vektora
+  \item \textbf{Jadrové funkcie} -- porovnanie lineárneho, RBF
+        a~polynomiálneho jadra na rovnakom datasete
+  \item \textbf{Datasety a metriky} -- $k$-násobná krížová validácia,
+        ROC krivka, mriežkové vyhľadávanie, krivka učenia
+  \item \textbf{Porovnanie modelov} -- SVM vs.\ $k$-NN vs.\ logistická
+        regresia vs.\ rozhodovací strom
+\end{enumerate}
+
+% =============================================================================
+\section{Teoretický základ}
+% =============================================================================
+
+\subsection{Definícia SVM}
+
+SVM je algoritmus učenia s~učiteľom (\textit{supervised learning}), ktorý hľadá
+\textbf{optimálnu nadrovinu} (hyperplane) oddeľujúcu dáta do dvoch tried
+so~\textbf{maximálnym marginom}. Margin je vzdialenosť medzi rozhodovacou
+hranicou a~najbližšími dátovými bodmi z~každej triedy. Tieto kľúčové body
+sa nazývajú \textbf{podporné vektory} (support vectors) a~sú to jediné
+trénovacie vzorky, ktoré model potrebuje na predikciu.
+
+\subsection{Geometria marginu}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{geometria_marginu.png}
+  \caption{Geometria SVM: rozhodovacia hranica, marginový pás a~podporné
+           vektory. Šírka marginu je $2/\norm{\mathbf{w}}$.}
+  \label{fig:geometria}
+\end{figure}
+
+Rozhodovacia hranica je definovaná rovnicou:
+\begin{equation}
+  \mathbf{w} \cdot \mathbf{x} + b = 0,
+\end{equation}
+pričom body spĺňajúce $\mathbf{w} \cdot \mathbf{x} + b = +1$ tvoria kladnú
+marginovú nadrovinu a~body spĺňajúce $\mathbf{w} \cdot \mathbf{x} + b = -1$
+tvoria zápornú marginovú nadrovinu. Šírka marginu je teda $2/\norm{\mathbf{w}}$
+(viď obrázok \ref{fig:geometria}).
+
+\subsection{Optimalizačný problém -- primárna forma}
+
+Pre \textbf{lineárne separovateľné dáta} (hard-margin SVM):
+\begin{equation}
+  \min_{\mathbf{w},\,b} \;\frac{1}{2}\norm{\mathbf{w}}^2
+  \quad \text{s.t.} \quad
+  y_i(\mathbf{w} \cdot \mathbf{x}_i + b) \geq 1, \quad \forall\, i.
+\end{equation}
+
+Pre \textbf{lineárne neseparovateľné dáta} (soft-margin SVM) sa zavádza
+premenná ohybnosti (slack variable) $\xi_i \geq 0$ a~regularizačný
+parameter $C > 0$:
+\begin{equation}
+  \min_{\mathbf{w},\,b,\,\boldsymbol{\xi}} \;\frac{1}{2}\norm{\mathbf{w}}^2
+  + C\sum_{i=1}^{n} \xi_i
+  \quad \text{s.t.} \quad
+  y_i(\mathbf{w} \cdot \mathbf{x}_i + b) \geq 1 - \xi_i,\quad \xi_i \geq 0.
+\end{equation}
+
+Parameter $C$ riadi kompromis medzi veľkosťou marginu a~počtom chybných
+klasifikácií: vysoké $C$ zodpovedá tvrdému marginu (riziko pretrénovania),
+nízke $C$ zodpovedá mäkkému marginu (riziko podtrénovania).
+
+\subsection{Duálna forma a trik s jadrom}
+
+Pomocou Lagrangeových multiplikátorov $\alpha_i \geq 0$ sa problém prevádza
+do~duálnej formy:
+\begin{equation}
+  \max_{\boldsymbol{\alpha}} \;\sum_{i=1}^{n}\alpha_i
+  - \frac{1}{2}\sum_{i=1}^{n}\sum_{j=1}^{n}
+    \alpha_i\alpha_j y_i y_j K(\mathbf{x}_i, \mathbf{x}_j)
+  \quad \text{s.t.} \quad
+  0 \leq \alpha_i \leq C,\quad \sum_{i=1}^{n}\alpha_i y_i = 0.
+\end{equation}
+
+V~duálnej forme sa vstupné vektory vyskytujú iba cez skalárny súčin
+$\mathbf{x}_i \cdot \mathbf{x}_j$, ktorý možno nahradiť \textbf{jadrovou
+funkciou} $K(\mathbf{x}_i, \mathbf{x}_j)$. Toto je \emph{trik s~jadrom}
+(kernel trick): implicitne mapuje dáta do~vyššieho dimenzionálneho priestoru
+$\varphi(\mathbf{x})$ bez explicitného výpočtu transformácie, keďže
+$K(\mathbf{x}_i, \mathbf{x}_j) = \varphi(\mathbf{x}_i)\cdot\varphi(\mathbf{x}_j)$.
+
+Predikčná funkcia natrénovaného modelu:
+\begin{equation}
+  f(\mathbf{x}) = \sum_{i \in \mathrm{SV}} \alpha_i y_i
+  K(\mathbf{x}_i, \mathbf{x}) + b,
+\end{equation}
+kde sumácia prebieha iba cez podporné vektory (body s~$\alpha_i > 0$).
+
+\subsection{Jadrové funkcie}
+
+\begin{table}[H]
+  \centering
+  \caption{Prehľad jadrových funkcií implementovaných v~aplikácii}
+  \begin{tabular}{llp{5.8cm}}
+    \toprule
+    \textbf{Jadro} & \textbf{Vzorec} & \textbf{Typické použitie} \\
+    \midrule
+    Lineárne
+      & $K(\mathbf{x},\mathbf{y}) = \mathbf{x}^{\T}\mathbf{y}$
+      & Textová klasifikácia, riedke vysokodimenzionálne dáta \\[4pt]
+    RBF (Gaussovo)
+      & $K(\mathbf{x},\mathbf{y}) = e^{-\gamma\norm{\mathbf{x}-\mathbf{y}}^2}$
+      & Väčšina nelineárnych problémov; predvolené jadro \\[4pt]
+    Polynomiálne
+      & $K(\mathbf{x},\mathbf{y}) = (\gamma\,\mathbf{x}^{\T}\mathbf{y}+c)^d$
+      & Spracovanie obrazu, polynomiálne vzťahy príznakov \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:jadra}
+\end{table}
+
+Parameter $\gamma$ v~RBF jadre riadi \emph{dosah vplyvu} každého
+trénovacieho bodu: vysoké $\gamma$ zodpovedá úzkemu dosahu (riziko
+pretrénovania), nízke $\gamma$ zodpovedá širšiemu dosahu (riziko
+podtrénovania).
+
+\subsection{Viactriedna klasifikácia: OvO a OvR}
+
+Základný SVM je binárny klasifikátor. Pre $K > 2$ tried sa používajú dve
+stratégie rozkladu:
+
+\begin{description}
+  \item[One-vs-Rest (OvR)] Pre každú z~$K$ tried sa natrénuje jeden SVM
+    (trieda $k$ oproti všetkým ostatným). Celkovo $K$ modelov. Predikuje
+    trieda s~najvyšším skóre $f_k(\mathbf{x})$.
+  \item[One-vs-One (OvO)] Pre každý pár tried sa natrénuje jeden SVM.
+    Celkovo $K(K-1)/2$ modelov. Predikuje trieda s~najviac hlasmi
+    (väčšinové hlasovanie).
+\end{description}
+
+Knižnica \texttt{scikit-learn} používa predvolene OvR pre lineárne jadro
+a~OvO pre ostatné jadrá. Pri $K = 10$ (napr.\ MNIST) vyžaduje OvO
+45~modelov, zatiaľ čo OvR iba 10.
+
+% =============================================================================
+\section{Implementácia}
+% =============================================================================
+
+\subsection{Algoritmus SMO}
+
+Na~riešenie kvadratickej optimalizačnej úlohy je implementovaný algoritmus
+\textbf{Sequential Minimal Optimization (SMO)} podľa Platta (1998).
+SMO rozkladá veľký QP problém na sériu minimálnych dvojrozmerných
+podproblémov, ktoré majú analytické riešenie.
+
+Kľúčové kroky implementácie:
+\begin{enumerate}
+  \item Predvýpočet celej matice jadra $K_{ij}$ pre zrýchlenie tréningu
+  \item Heuristika výberu druhého pivota: maximalizácia $|E_i - E_j|$
+        (Plattova heuristika -- výber najväčšieho kroku)
+  \item Analytická aktualizácia $\alpha_i$, $\alpha_j$ s orezaním
+        na $[L, H]$
+  \item Aktualizácia prahu $b$ podľa podmienok KKT
+  \item Konvergencia: zastavenie po niekoľkých priebehoch bez zmeny
+\end{enumerate}
+
+\begin{lstlisting}[caption={Jadro SMO aktualizácie -- heuristika a analytická aktualizácia}]
+// Heuristika vyberu j: maximalizuj |Ei - Ej|
+let best = -1, bestDiff = 0;
+for (let k = 0; k < n; k++) {
+  if (k === i) continue;
+  const diff = Math.abs(Ecache[i] - Ecache[k]);
+  if (diff > bestDiff) { bestDiff = diff; best = k; }
+}
+
+// Analytická aktualizácia alpha_j
+const eta = 2*K[i][j] - K[i][i] - K[j][j];
+if (eta >= 0) continue;
+this.alpha[j] -= y[j] * (Ecache[i] - Ej) / eta;
+this.alpha[j] = Math.max(L, Math.min(H, this.alpha[j]));
+
+// Aktualizácia prahu b
+const b1 = this.b - Ei
+  - y[i]*(this.alpha[i]-ai0)*K[i][i]
+  - y[j]*(this.alpha[j]-aj0)*K[i][j];
+this.b = (this.alpha[i] > 0 && this.alpha[i] < C) ? b1 : ...;
+\end{lstlisting}
+
+Pre lineárne jadro sa po tréningu explicitne vypočíta váhový vektor:
+\begin{equation}
+  \mathbf{w} = \sum_{i=1}^{n} \alpha_i y_i \mathbf{x}_i.
+\end{equation}
+Tento vektor je vizualizovaný v~aplikácii ako šípka v~2D priestore
+spolu so skutočnou šírkou marginu $2/\norm{\mathbf{w}}$.
+
+\subsection{Implementované klasifikátory pre porovnanie}
+
+Okrem SVM sú pre účely porovnania implementované od základov:
+
+\begin{itemize}
+  \item \textbf{$k$-najbližší susedia ($k$-NN)}: predikcia na základe
+    väčšinového hlasovania $k$ najbližších trénovacích bodov
+    (euklidovská vzdialenosť, $k = 5$).
+  \item \textbf{Logistická regresia}: gradientový zostup minimalizujúci
+    krížovú entropiu, 150 epoch, rýchlosť učenia $\eta = 0.1$.
+  \item \textbf{Rozhodovací strom}: rekurzívne delenie pomocou Giniho
+    nečistoty, maximálna hĺbka $d = 5$.
+\end{itemize}
+
+\subsection{Datasety}
+
+\begin{table}[H]
+  \centering
+  \caption{Datasety použité v~aplikácii}
+  \begin{tabular}{lllll}
+    \toprule
+    \textbf{Dataset} & \textbf{Zdroj} & \textbf{Vzorky}
+      & \textbf{Príznaky} & \textbf{Triedy} \\
+    \midrule
+    Iris (setosa vs.\ versicolor)
+      & UCI ML Repository & 75 + 75 & 4 & 2 \\
+    Breast Cancer (benígne vs.\ malígne)
+      & UCI ML Repository & 36 + 28 & 4 & 2 \\
+    Mesiačiky (syntetický)
+      & generovaný & variabilný & 2 & 2 \\
+    Kruhy (syntetický)
+      & generovaný & variabilný & 2 & 2 \\
+    XOR (syntetický)
+      & generovaný & variabilný & 2 & 2 \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:datasety}
+\end{table}
+
+Reálne datasety sú normalizované na interval $[0, 1]$ pomocou min-max
+škálovania samostatne pre každý príznak.
+
+% =============================================================================
+\section{Metriky efektívnosti}
+% =============================================================================
+
+\subsection{Základné metriky klasifikácie}
+
+Z~konfúznej matice (TP, FP, FN, TN) sú vypočítavané nasledujúce metriky:
+
+\begin{align}
+  \text{Presnosť (Accuracy)} &= \frac{TP + TN}{TP + FP + FN + TN}, \\[6pt]
+  \text{Precíznosť (Precision)} &= \frac{TP}{TP + FP}, \\[6pt]
+  \text{Úplnosť (Recall)} &= \frac{TP}{TP + FN}, \\[6pt]
+  \text{F1-skóre} &= \frac{2 \cdot \text{Precíznosť} \cdot \text{Úplnosť}}
+    {\text{Precíznosť} + \text{Úplnosť}}, \\[6pt]
+  \text{Špecificita (Specificity)} &= \frac{TN}{TN + FP}.
+\end{align}
+
+Konfúzna matica je v~aplikácii zobrazovaná s~farebnými poliami:
+pravé pozitívy (TP) žltou, pravé negatívy (TN) oranžovou,
+nepravé pozitívy (FP) červenou a~nepravé negatívy (FN) ružovou.
+
+\subsection{$k$-násobná krížová validácia}
+
+Na~spoľahlivé vyhodnotenie výkonnosti modelu sa používa
+\textbf{$k$-násobná krížová validácia} ($k$-fold cross-validation).
+Dataset sa rozdelí na~$k$ podmnožín (foldov); model sa $k$-krát
+natrénuje na~$k-1$ foldoch a~testuje na~zostávajúcom foldze.
+Výsledná metrika je priemer a~smerodajná odchýlka:
+\begin{equation}
+  \bar{A} = \frac{1}{k}\sum_{f=1}^{k} A_f,
+  \qquad
+  \sigma = \sqrt{\frac{1}{k}\sum_{f=1}^{k}(A_f - \bar{A})^2}.
+\end{equation}
+Aplikácia podporuje $k \in \{3, 5, 10\}$.
+
+\subsection{ROC krivka a AUC}
+
+ROC krivka (Receiver Operating Characteristic) znázorňuje závislosť
+miery pravých pozitív (TPR) od~miery nepravých pozitív (FPR) pri~rôznych
+klasifikačných prahoch. Plocha pod~krivkou (AUC) sa odhaduje
+lichobežníkovou metódou:
+\begin{equation}
+  \mathrm{AUC} \approx \sum_{i=1}^{m}
+  \bigl(\mathrm{FPR}_i - \mathrm{FPR}_{i-1}\bigr)
+  \cdot \frac{\mathrm{TPR}_i + \mathrm{TPR}_{i-1}}{2}.
+\end{equation}
+Hodnota AUC = 1 zodpovedá dokonalému klasifikátoru, AUC = 0.5
+zodpovedá náhodnému uhádnutiu.
+
+\subsection{Mriežkové vyhľadávanie (Grid Search)}
+
+Mriežkové vyhľadávanie systematicky vyskúša všetky kombinácie hodnôt
+parametrov $C$ a~$\gamma$ zo~zadanej mriežky:
+\begin{equation}
+  C \in \{0.1,\; 0.5,\; 1,\; 5,\; 10,\; 50\},
+  \qquad
+  \gamma \in \{0.05,\; 0.1,\; 0.5,\; 1,\; 5,\; 10\}.
+\end{equation}
+Pre~každú kombináciu sa vykonáva 3-násobná krížová validácia. Výsledky
+sú zobrazené ako~tepelná mapa (heatmap): tmavá farba = nízka presnosť,
+svetlá zlatá = vysoká presnosť. Optimálna kombinácia je zvýraznená rámčekom.
+
+\subsection{Krivka učenia (Learning Curve)}
+
+Krivka učenia zobrazuje závislosť trénovacej a~testovacej presnosti
+od~veľkosti trénovacej množiny (10\,\% až 90\,\% dostupných dát).
+Umožňuje diagnostikovať:
+\begin{itemize}
+  \item \textbf{Pretrénovanie (overfitting)}: veľká medzera medzi
+    trénovacou a~testovacou krivkou (medzera $> 20\,\%$)
+  \item \textbf{Podtrénovanie (underfitting)}: obe krivky konvergujú
+    k~nízkej hodnote ($< 70\,\%$)
+  \item \textbf{Dobrá generalizácia}: krivky sa priblížia k~sebe
+    pri~vysokej testovacej presnosti
+\end{itemize}
+Aplikácia automaticky vyhodnotí medzeru a~zobrazí textové odporúčanie
+(napr.\ znížiť $C$ pri pretrénovatí).
+
+% =============================================================================
+\section{Popis funkcionality aplikácie}
+% =============================================================================
+
+\subsection{Interaktívna vizualizácia}
+
+Záložka \emph{Interaktívna demo} umožňuje:
+\begin{itemize}
+  \item kliknutím na~plátno (canvas $500 \times 500$ px) pridávať body
+    dvoch tried,
+  \item výber jadrovej funkcie (lineárne, RBF, polynomiálne),
+  \item nastavenie parametrov $C \in [10^{-2},\; 10^{3}]$
+    a~$\gamma \in [10^{-2},\; 10^{2}]$ pomocou posuvníkov,
+  \item načítanie prednastavených datasetov (lineárny, XOR, kruhy,
+    mesiačiky),
+  \item vizualizáciu tepelnej mapy predikčného skóre, marginových
+    priamok a~zvýraznenie podporných vektorov s~aureolou.
+\end{itemize}
+
+Pre~\textbf{lineárne jadro} sa po tréningu zobrazuje sekcia
+\emph{Váhový vektor $\mathbf{w}$} obsahujúca:
+\begin{itemize}
+  \item smerový SVG diagram vektora $\mathbf{w}$ v~2D priestore
+    (šípka + prerušovaná kolmica znázorňujúca smer hranice),
+  \item relatívne veľkosti zložiek $w_x$, $w_y$ ako~animované
+    progress bary,
+  \item normu $\norm{\mathbf{w}}$ a~šírku marginu $2/\norm{\mathbf{w}}$.
+\end{itemize}
+
+\subsection{Metriky zobrazované po tréningu}
+
+\begin{table}[H]
+  \centering
+  \caption{Metriky zobrazované po tréningu v~interaktívnej demo}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Metrika} & \textbf{Popis} \\
+    \midrule
+    Accuracy
+      & Podiel správne klasifikovaných trénovacích bodov \\
+    Support vectors
+      & Počet podporných vektorov (body s~$\alpha_i > 0$) \\
+    Margin $2/\norm{\mathbf{w}}$
+      & Šírka marginu (len pre lineárne jadro) \\
+    SMO iterácie
+      & Počet iterácií optimalizačného algoritmu \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Porovnanie algoritmov}
+
+Záložka \emph{Porovnanie modelov} vyhodnocuje 5 algoritmov pomocou
+5-násobnej krížovej validácie na~syntetickom datasete podľa výberu.
+Výsledky sú prezentované ako:
+\begin{itemize}
+  \item vodorovný stĺpcový graf presnosti s~farebne odlíšenými stĺpcami,
+  \item vizualizácia rozhodovacích hraníc pre~všetky štyri algoritmy
+    vedľa seba (tepelná mapa na plátne $190 \times 190$ px),
+  \item súhrnná tabuľka s~presnosťou, smerodajnou odchýlkou, F1-skóre
+    a~časom tréningu v~milisekundách.
+\end{itemize}
+
+% =============================================================================
+\section{Technické riešenie}
+% =============================================================================
+
+\subsection{Technológie}
+
+\begin{table}[H]
+  \centering
+  \caption{Použité technológie}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Technológia} & \textbf{Verzia} & \textbf{Účel} \\
+    \midrule
+    HTML5             & --      & Štruktúra dokumentu, Canvas API \\
+    CSS3              & --      & Štýlovanie, animácie, CSS premenné \\
+    JavaScript (ES6+) & --      & Logika, SMO, ML algoritmy \\
+    Chart.js          & 4.4.1   & Grafy (ROC, krivka učenia, bar chart) \\
+    SVG               & --      & Geometrický diagram, váhový vektor \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Architektúra kódu}
+
+Celý kód je uložený v~jedinom súbore bez externých závislostí
+na~strojového učenia knižniciach. Hlavné triedy a funkcie:
+
+\begin{description}
+  \item[\texttt{class SVM}] Implementácia SVM s~voliteľným jadrom.
+    Metódy: \texttt{K()} -- jadrová funkcia, \texttt{train()} -- SMO
+    s~heuristickým výberom pivota, \texttt{predict()} -- predikcia.
+  \item[\texttt{generateDataset(type, n)}] Generátor syntetických
+    datasetov (mesiačiky, kruhy, XOR, lineárny).
+  \item[\texttt{kFoldCV(X, y, k, kernel, C, gamma)}] Univerzálna
+    $k$-násobná krížová validácia; vracia priemerné Accuracy,
+    smerodajnú odchýlku a~priemerné F1-skóre.
+  \item[\texttt{computeMetrics(yTrue, yPred)}] Výpočet TP, FP, FN, TN
+    a~odvodených metrík vrátane F1-skóre a~špecificity.
+  \item[\texttt{runGridSearch()}] Mriežkové vyhľadávanie parametrov
+    $C \times \gamma$ s~vykreslením tepelnej mapy.
+  \item[\texttt{runLearningCurve()}] Krivka učenia s~automatickou
+    interpretáciou výsledku (overfitting / underfitting / OK).
+  \item[\texttt{trainSVM()}] Obsluha interaktívneho plátna,
+    vizualizácia váhového vektora pomocou SVG.
+\end{description}
+
+% =============================================================================
+\section{Výsledky a zhrnutie}
+% =============================================================================
+
+Aplikácia demonštruje, že SVM je výkonný algoritmus s~jasnou geometrickou
+interpretáciou a~flexibilnou jadrovovou funkciou. Kľúčové zistenia
+z~experimentov:
+
+\begin{itemize}
+  \item \textbf{Lineárne jadro} dosahuje vysokú presnosť na~lineárne
+    separovateľných datasetoch (Iris: $\approx 95\,\%$), avšak zlyháva
+    na~nelineárnych dátach (kruhy, XOR).
+  \item \textbf{RBF jadro} je najuniverzálnejšie -- dosahuje $> 95\,\%$
+    presnosť na~mesiačikoch aj kruhoch pri~správnom nastavení $\gamma$.
+  \item \textbf{Polynomiálne jadro} ($d = 3$) funguje dobre pre~XOR
+    a~iné polynomiálne vzťahy, ale je citlivé na~voľbu parametrov.
+  \item \textbf{Mriežkové vyhľadávanie} jednoznačne ukazuje, že voľba
+    optimálnych parametrov $C$ a~$\gamma$ má zásadný vplyv na~výkonnosť.
+  \item Na~testovaných datasetoch SVM s~RBF jadrom konzistentne
+    prekonáva logistickú regresiu na~nelineárnych problémoch a~dosahuje
+    porovnateľné výsledky s~$k$-NN pri~výrazne menšom počte uložených
+    trénovacích vzoriek.
+\end{itemize}
+
+% =============================================================================
+\section*{Referencie}
+\addcontentsline{toc}{section}{Referencie}
+% =============================================================================
+
+\begin{thebibliography}{9}
+
+\bibitem{cortes1995}
+  C.~Cortes, V.~Vapnik,
+  \textit{Support-Vector Networks}.
+  Machine Learning, 20(3):273--297, 1995.
+
+\bibitem{platt1998}
+  J.~C.~Platt,
+  \textit{Sequential Minimal Optimization: A Fast Algorithm for Training
+  Support Vector Machines}.
+  Microsoft Research Technical Report MSR-TR-98-14, 1998.
+
+\bibitem{scholkopf2002}
+  B.~Schölkopf, A.~J.~Smola,
+  \textit{Learning with Kernels: Support Vector Machines, Regularization,
+  Optimization, and Beyond}.
+  MIT Press, 2002.
+
+\bibitem{uci}
+  D.~Dua, C.~Graff,
+  \textit{UCI Machine Learning Repository}.
+  University of California, Irvine, 2019.
+  \url{https://archive.ics.uci.edu}
+
+\end{thebibliography}
+
+\end{document}

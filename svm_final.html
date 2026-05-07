@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVM – Metóda podporných vektorov</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg:      #0d0a0e;
+  --bg2:     #16111a;
+  --bg3:     #1f1824;
+  --bg4:     #2a2030;
+  --c1:      #C73866;
+  --c2:      #FE676E;
+  --c3:      #FD8F52;
+  --c4:      #FFBD71;
+  --c5:      #FFDCA2;
+  --accent:  #FD8F52;
+  --accent2: #FE676E;
+  --accent3: #C73866;
+  --pos:     #FFBD71;
+  --neg:     #FE676E;
+  --success: #10b981;
+  --danger:  #ef4444;
+  --text:    #f0e8e0;
+  --text2:   #a89888;
+  --text3:   #6b5a50;
+  --border:  #2a1e28;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Source Sans 3',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+.hero {
+  text-align:center;
+  padding:3rem 1rem 2rem;
+  background: linear-gradient(135deg, #0d0a0e 0%, #1a0d18 40%, #1f0f10 100%);
+  border-bottom:1px solid var(--border);
+  position:relative; overflow:hidden;
+}
+.hero::before {
+  content:'';
+  position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+  background:
+    radial-gradient(circle at 25% 50%, rgba(199,56,102,0.08) 0%, transparent 45%),
+    radial-gradient(circle at 75% 50%, rgba(253,143,82,0.08) 0%, transparent 45%);
+  animation:heroGlow 10s ease-in-out infinite alternate;
+}
+@keyframes heroGlow { from{transform:scale(1)} to{transform:scale(1.08)} }
+.hero h1 { font-size:2.5rem; font-weight:700; position:relative; letter-spacing:-0.5px; }
+.hero h1 span { background:linear-gradient(100deg,var(--c1),var(--c2),var(--c3),var(--c4)); background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero p { color:var(--text2); margin-top:0.4rem; font-size:1rem; position:relative; }
+
+nav {
+  display:flex; justify-content:center; gap:4px;
+  padding:0.7rem 1rem; background:var(--bg2);
+  border-bottom:1px solid var(--border); flex-wrap:wrap;
+  position:sticky; top:0; z-index:100;
+}
+nav button {
+  background:transparent; border:1px solid transparent;
+  color:var(--text2); padding:0.45rem 1.1rem; border-radius:8px;
+  cursor:pointer; font-family:inherit; font-size:0.88rem; font-weight:500;
+  transition:all 0.2s;
+}
+nav button:hover { color:var(--text); background:var(--bg3); }
+nav button.active { color:var(--accent); background:var(--bg3); border-color:var(--accent); }
+
+.tab-content { display:none; padding:2rem 1.5rem; max-width:1100px; margin:0 auto; }
+.tab-content.active { display:block; }
+
+h2 { font-size:1.45rem; margin-bottom:1rem; font-weight:600; }
+h3 { font-size:1.1rem; margin:1.5rem 0 0.75rem; font-weight:600; color:var(--accent); }
+h4 { font-size:0.95rem; font-weight:600; margin-bottom:0.5rem; }
+
+.card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:1.5rem; margin-bottom:1.25rem;
+}
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; }
+@media(max-width:768px){ .grid2{grid-template-columns:1fr} }
+
+.metric-box {
+  background:var(--bg3); border-radius:10px; padding:1rem 1.25rem; text-align:center;
+}
+.metric-box .val { font-size:1.75rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--accent); }
+.metric-box .lbl { font-size:0.75rem; color:var(--text2); margin-top:0.2rem; text-transform:uppercase; letter-spacing:1px; }
+
+.controls-row { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end; margin-bottom:1rem; }
+.control-group { display:flex; flex-direction:column; gap:4px; }
+.control-group label { font-size:0.75rem; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; font-weight:500; }
+.control-group select, .control-group input[type="range"] {
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text); padding:6px 10px; border-radius:6px;
+  font-family:inherit; font-size:0.85rem;
+}
+.control-group select { min-width:140px; }
+.control-group input[type="range"] { width:120px; accent-color:var(--accent); }
+
+button.btn {
+  background:var(--accent); color:#1a0a00; border:none;
+  padding:0.5rem 1.2rem; border-radius:8px; cursor:pointer;
+  font-family:inherit; font-weight:700; font-size:0.85rem;
+  transition:all 0.2s; white-space:nowrap;
+}
+button.btn:hover { filter:brightness(1.12); transform:translateY(-1px); }
+button.btn.secondary { background:var(--bg3); color:var(--text); border:1px solid var(--border); font-weight:500; }
+button.btn.secondary:hover { background:var(--bg4); }
+
+canvas#svmCanvas {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:10px; cursor:crosshair; display:block;
+  width:100%; max-width:560px; aspect-ratio:1;
+}
+
+.legend-row { display:flex; gap:1.5rem; margin-top:0.75rem; font-size:0.82rem; color:var(--text2); flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:6px; }
+.legend-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+
+.math-block {
+  background:var(--bg3); border-left:3px solid var(--c1);
+  padding:1rem 1.25rem; border-radius:0 8px 8px 0;
+  font-family:'JetBrains Mono',monospace; font-size:0.88rem;
+  margin:0.75rem 0; overflow-x:auto; line-height:1.9; color:var(--c5);
+}
+
+.prose { line-height:1.78; color:var(--text2); font-size:0.93rem; }
+.prose strong { color:var(--text); font-weight:600; }
+.prose em { color:var(--c4); font-style:normal; }
+
+.chart-container { position:relative; height:280px; margin:1rem 0; }
+
+.anim-in { animation:fadeSlide 0.35s ease-out; }
+@keyframes fadeSlide { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+table.data-table {
+  width:100%; border-collapse:collapse; font-size:0.85rem; margin:0.75rem 0;
+}
+table.data-table th {
+  background:var(--bg3); padding:0.55rem 0.75rem; text-align:left;
+  font-weight:600; border-bottom:2px solid var(--border);
+  color:var(--text2); text-transform:uppercase; font-size:0.73rem; letter-spacing:0.5px;
+}
+table.data-table td { padding:0.45rem 0.75rem; border-bottom:1px solid var(--border); }
+table.data-table tr:hover td { background:var(--bg3); }
+
+.confusion-matrix {
+  display:grid; grid-template-columns:auto 1fr 1fr;
+  max-width:300px; font-family:'JetBrains Mono',monospace;
+}
+.cm-cell { padding:0.65rem; text-align:center; font-weight:600; font-size:1rem; border:1px solid var(--border); }
+.cm-header { background:var(--bg3); font-size:0.7rem; color:var(--text2); font-weight:500; text-transform:uppercase; }
+.cm-tp { background:rgba(255,189,113,0.12); color:var(--c4); }
+.cm-tn { background:rgba(253,143,82,0.12); color:var(--c3); }
+.cm-fp { background:rgba(239,68,68,0.12); color:#ef4444; }
+.cm-fn { background:rgba(254,103,110,0.12); color:var(--c2); }
+
+.tag { display:inline-block; padding:2px 10px; border-radius:20px; font-size:0.73rem; font-weight:600; margin-right:4px; }
+.tag-a { background:rgba(199,56,102,0.15); color:var(--c1); }
+.tag-b { background:rgba(253,143,82,0.15); color:var(--c3); }
+.tag-c { background:rgba(255,189,113,0.15); color:var(--c4); }
+
+.kernel-viz { display:flex; gap:1rem; flex-wrap:wrap; margin:1rem 0; }
+.kernel-card {
+  flex:1; min-width:190px; background:var(--bg3);
+  border:1px solid var(--border); border-radius:10px; padding:1rem;
+  cursor:pointer; transition:all 0.2s;
+}
+.kernel-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+.kernel-card.active { border-color:var(--accent); box-shadow:0 0 20px rgba(253,143,82,0.12); }
+.kernel-card h4 { font-size:0.9rem; margin:0.35rem 0 0.3rem; }
+.kernel-card p { font-size:0.76rem; color:var(--text3); }
+
+/* Heatmap grid */
+.heatmap-grid { display:grid; gap:2px; }
+.hm-cell {
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  font-size:0.65rem; font-family:'JetBrains Mono',monospace;
+  border-radius:3px; font-weight:600;
+}
+
+footer { text-align:center; padding:2rem; color:var(--text3); font-size:0.78rem; border-top:1px solid var(--border); margin-top:2rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1><span>Support Vector Machine</span></h1>
+  <p>Interaktívny projekt z predmetu Strojové učenie &nbsp;·&nbsp; SVM</p>
+</div>
+
+<nav id="mainNav">
+  <button class="active"  onclick="showTab('teoria')">Teória SVM</button>
+  <button onclick="showTab('interaktiv')">Interaktívna demo</button>
+  <button onclick="showTab('jadra')">Jadrové funkcie</button>
+  <button onclick="showTab('datasety')">Datasety &amp; Metriky</button>
+  <button onclick="showTab('porovnanie')">Porovnanie modelov</button>
+</nav>
+
+<!-- ===== TAB 1: TEORIA ===== -->
+<div id="tab-teoria" class="tab-content active anim-in">
+
+  <!-- Roadmap -->
+  <div class="card" style="border-color:var(--c1);background:linear-gradient(135deg,rgba(199,56,102,0.06),rgba(253,143,82,0.04));">
+    <h4 style="margin-bottom:0.75rem;">Sprievodca projektom</h4>
+    <div style="display:flex;gap:0;flex-wrap:wrap;">
+      <div style="flex:1;min-width:150px;text-align:center;padding:0.5rem;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--c1);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;margin:0 auto 0.4rem;">1</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text);">Teória SVM</div>
+        <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">Geometria, matematika, OvO/OvR</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text3);font-size:0.9rem;padding:0 4px;">→</div>
+      <div style="flex:1;min-width:150px;text-align:center;padding:0.5rem;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--c2);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;margin:0 auto 0.4rem;">2</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text);">Interaktívna demo</div>
+        <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">Klikaj body, vyber jadro, trénuj</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text3);font-size:0.9rem;padding:0 4px;">→</div>
+      <div style="flex:1;min-width:150px;text-align:center;padding:0.5rem;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--c3);color:#1a0a00;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;margin:0 auto 0.4rem;">3</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text);">Jadrové funkcie</div>
+        <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">Linear vs RBF vs Poly</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text3);font-size:0.9rem;padding:0 4px;">→</div>
+      <div style="flex:1;min-width:150px;text-align:center;padding:0.5rem;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--c4);color:#1a0a00;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;margin:0 auto 0.4rem;">4</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text);">Datasety &amp; Metriky</div>
+        <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">k-fold CV, ROC, grid search, learning curve</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text3);font-size:0.9rem;padding:0 4px;">→</div>
+      <div style="flex:1;min-width:150px;text-align:center;padding:0.5rem;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--c5);color:#1a0a00;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;margin:0 auto 0.4rem;">5</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text);">Porovnanie modelov</div>
+        <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">SVM vs kNN vs LR vs DT</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Čo je SVM?</h2>
+  <div class="card">
+    <p class="prose">
+      <strong>Support Vector Machine (SVM)</strong> je algoritmus <em>supervised learning</em>,
+      ktorý hľadá optimálnu <em>nadrovinu</em> (hyperplane) maximalizujúcu <strong>margin</strong> –
+      vzdialenosť medzi rozhodovacou hranicou a najbližšími dátovými bodmi z oboch tried.
+      Tieto kľúčové body sa nazývajú <em>podporné vektory</em> a sú jediné, čo model
+      potrebuje na predikciu.
+    </p>
+  </div>
+
+  <h3>Geometria SVM – margin a podporné vektory</h3>
+  <div class="card">
+    <svg width="100%" viewBox="0 0 680 310" role="img">
+      <title>Geometria SVM: margin, rozhodovacia hranica a podporné vektory</title>
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Margin band fill -->
+      <polygon points="140,20 380,290 420,290 180,20" fill="rgba(253,143,82,0.06)" />
+
+      <!-- Margin lines (dashed) -->
+      <line x1="140" y1="20" x2="380" y2="290" stroke="rgba(253,143,82,0.35)" stroke-width="1" stroke-dasharray="5,4"/>
+      <line x1="420" y1="290" x2="180" y2="20" stroke="rgba(253,143,82,0.35)" stroke-width="1" stroke-dasharray="5,4"/>
+
+      <!-- Decision boundary (solid) -->
+      <line x1="160" y1="20" x2="400" y2="290" stroke="#FFDCA2" stroke-width="2"/>
+
+      <!-- Margin width arrow -->
+      <line x1="200" y1="105" x2="320" y2="140" stroke="var(--c3)" stroke-width="1.5" marker-end="url(#arr)" marker-start="url(#arr)"/>
+      <text x="258" y="112" text-anchor="middle" font-family="'Source Sans 3',sans-serif" font-size="12" fill="var(--c3)" font-weight="600">margin = 2/‖w‖</text>
+
+      <!-- Positive class points (yellow/amber) -->
+      <circle cx="90"  cy="60"  r="7" fill="var(--c4)"/>
+      <circle cx="60"  cy="110" r="7" fill="var(--c4)"/>
+      <circle cx="110" cy="145" r="7" fill="var(--c4)"/>
+      <circle cx="55"  cy="180" r="7" fill="var(--c4)"/>
+      <circle cx="80"  cy="230" r="7" fill="var(--c4)"/>
+      <circle cx="40"  cy="255" r="7" fill="var(--c4)"/>
+
+      <!-- Negative class points (pink/red) -->
+      <circle cx="460" cy="60"  r="7" fill="var(--c2)"/>
+      <circle cx="500" cy="100" r="7" fill="var(--c2)"/>
+      <circle cx="470" cy="155" r="7" fill="var(--c2)"/>
+      <circle cx="520" cy="195" r="7" fill="var(--c2)"/>
+      <circle cx="490" cy="245" r="7" fill="var(--c2)"/>
+      <circle cx="540" cy="270" r="7" fill="var(--c2)"/>
+
+      <!-- Support vectors (highlighted) -->
+      <circle cx="150" cy="75"  r="8" fill="var(--c4)" stroke="#FFDCA2" stroke-width="2.5"/>
+      <circle cx="130" cy="195" r="8" fill="var(--c4)" stroke="#FFDCA2" stroke-width="2.5"/>
+      <circle cx="430" cy="110" r="8" fill="var(--c2)" stroke="#FFDCA2" stroke-width="2.5"/>
+      <circle cx="415" cy="230" r="8" fill="var(--c2)" stroke="#FFDCA2" stroke-width="2.5"/>
+      <!-- SV glow rings -->
+      <circle cx="150" cy="75"  r="14" fill="none" stroke="rgba(255,220,162,0.25)" stroke-width="1.5"/>
+      <circle cx="130" cy="195" r="14" fill="none" stroke="rgba(255,220,162,0.25)" stroke-width="1.5"/>
+      <circle cx="430" cy="110" r="14" fill="none" stroke="rgba(255,220,162,0.25)" stroke-width="1.5"/>
+      <circle cx="415" cy="230" r="14" fill="none" stroke="rgba(255,220,162,0.25)" stroke-width="1.5"/>
+
+      <!-- Labels -->
+      <text x="46" y="42" font-family="'Source Sans 3',sans-serif" font-size="12" fill="var(--c4)" font-weight="600">Trieda +1</text>
+      <text x="575" y="275" font-family="'Source Sans 3',sans-serif" font-size="12" fill="var(--c2)" font-weight="600">Trieda −1</text>
+
+      <!-- Decision boundary label -->
+      <rect x="220" y="175" width="142" height="22" rx="4" fill="rgba(255,220,162,0.08)" stroke="rgba(255,220,162,0.2)" stroke-width="0.5"/>
+      <text x="295" y="190" text-anchor="middle" font-family="'Source Sans 3',sans-serif" font-size="11" fill="var(--c5)">w·x + b = 0</text>
+
+      <!-- w·x+b=+1 label -->
+      <text x="105" y="18" font-family="'JetBrains Mono',monospace" font-size="10" fill="rgba(253,143,82,0.6)">w·x+b = +1</text>
+      <!-- w·x+b=-1 label -->
+      <text x="428" y="294" font-family="'JetBrains Mono',monospace" font-size="10" fill="rgba(253,143,82,0.6)">w·x+b = −1</text>
+
+      <!-- SV label with leader -->
+      <line x1="150" y1="61" x2="192" y2="20" stroke="rgba(255,220,162,0.4)" stroke-width="0.8" stroke-dasharray="3,3"/>
+      <text x="196" y="17" font-family="'Source Sans 3',sans-serif" font-size="11" fill="var(--c5)">Podporné vektory</text>
+    </svg>
+    <p class="prose" style="margin-top:0.75rem;">
+      Zvýraznené body s krúžkom sú <em>podporné vektory</em> – jediné body, ktoré definujú
+      polohu rozhodovací hranice. Zvyšné body môžeme odstrániť a model sa nezmení.
+    </p>
+  </div>
+
+  <h3>Matematická formulácia</h3>
+  <div class="card">
+    <p class="prose">Pre lineárne separovateľné dáta hľadáme nadrovinu <strong>w·x + b = 0</strong>.
+    Optimalizačný problém (primal form):</p>
+    <div class="math-block">min  ½ ‖w‖²<br>s.t.  yᵢ(w·xᵢ + b) ≥ 1,  ∀i</div>
+    <p class="prose" style="margin-top:0.75rem;">Pre nelineárne separovateľné dáta
+    (<em>soft-margin SVM</em>) sa pridáva slack premenná ξᵢ a parameter <strong>C</strong>:</p>
+    <div class="math-block">min  ½ ‖w‖² + C·Σξᵢ<br>s.t.  yᵢ(w·xᵢ + b) ≥ 1 − ξᵢ,  ξᵢ ≥ 0</div>
+    <p class="prose" style="margin-top:0.75rem;">
+      Cez <strong>Lagrangeove multiplikátory αᵢ</strong> sa prechádza do duálnej formy,
+      kde sa skalárny súčin xᵢ·xⱼ nahrádza <em>jadrovou funkciou</em> K(xᵢ,xⱼ) – tzv. kernel trick:
+    </p>
+    <div class="math-block">max  Σαᵢ − ½ΣΣαᵢαⱼyᵢyⱼK(xᵢ,xⱼ)<br>s.t.  0 ≤ αᵢ ≤ C,  Σαᵢyᵢ = 0</div>
+  </div>
+
+  <h3>Multiclass klasifikácia: OvO a OvR stratégie</h3>
+  <div class="card">
+    <p class="prose" style="margin-bottom:1rem;">
+      Základná SVM je <strong>binárny klasifikátor</strong> (2 triedy). Pre problémy s viac triedami
+      (napr. Iris má 3 druhy, MNIST má 10 číslic) sa používajú dve stratégie rozkladu:
+    </p>
+    <div class="grid2">
+      <div style="background:var(--bg3);border-radius:10px;padding:1.1rem;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.6rem;">
+          <span style="background:rgba(199,56,102,0.15);color:var(--c1);padding:2px 10px;border-radius:20px;font-size:0.73rem;font-weight:600;">OvR</span>
+          <h4 style="margin:0;">One-vs-Rest</h4>
+        </div>
+        <p class="prose" style="font-size:0.85rem;">
+          Pre každú z <em>K</em> tried sa trénuje jeden binárny SVM: trieda k vs. všetky ostatné.
+          Celkovo <strong>K modelov</strong>. Predikuje trieda s najvyšším skóre.
+        </p>
+        <div class="math-block" style="font-size:0.78rem;margin-top:0.6rem;padding:0.6rem 0.9rem;">
+          K=3 triedy → 3 modely<br>
+          M1: A vs {B,C}<br>
+          M2: B vs {A,C}<br>
+          M3: C vs {A,B}
+        </div>
+        <p style="font-size:0.78rem;color:var(--text3);margin-top:0.5rem;">+ Rýchlejší tréning &nbsp;− Nevyvážené triedy</p>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:1.1rem;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.6rem;">
+          <span style="background:rgba(253,143,82,0.15);color:var(--c3);padding:2px 10px;border-radius:20px;font-size:0.73rem;font-weight:600;">OvO</span>
+          <h4 style="margin:0;">One-vs-One</h4>
+        </div>
+        <p class="prose" style="font-size:0.85rem;">
+          Pre každý pár tried sa trénuje jeden SVM. Celkovo <strong>K(K−1)/2 modelov</strong>.
+          Predikuje trieda s najviac hlasmi (majority vote).
+        </p>
+        <div class="math-block" style="font-size:0.78rem;margin-top:0.6rem;padding:0.6rem 0.9rem;">
+          K=3 triedy → 3 modely<br>
+          M1: A vs B<br>
+          M2: A vs C<br>
+          M3: B vs C
+        </div>
+        <p style="font-size:0.78rem;color:var(--text3);margin-top:0.5rem;">+ Každý model trénuje na menej dátach &nbsp;− Viac modelov pri veľkom K</p>
+      </div>
+    </div>
+    <p class="prose" style="margin-top:1rem;font-size:0.85rem;">
+      scikit-learn používa štandardne <em>OvR</em> pre lineárne jadro a <em>OvO</em> pre ostatné.
+      Pri K=10 (napr. MNIST) OvO vyžaduje 45 modelov, OvR len 10.
+    </p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h4 style="color:var(--success);">✓ Výhody SVM</h4>
+      <ul class="prose" style="padding-left:1.2rem;margin-top:0.5rem;">
+        <li>Efektívny vo vysokodimenzionálnych priestoroch</li>
+        <li>Robustný voči overfittingu (princíp max-margin)</li>
+        <li>Pamäťovo úsporný – ukladá len podporné vektory</li>
+        <li>Flexibilný vďaka jadrovým funkciám</li>
+        <li>Funguje aj pri dimenziách &gt; počet vzoriek</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--danger);">✗ Nevýhody SVM</h4>
+      <ul class="prose" style="padding-left:1.2rem;margin-top:0.5rem;">
+        <li>Pomalý pri veľkých datasetoch O(n²–n³)</li>
+        <li>Citlivý na výber jadra a parametrov C, γ</li>
+        <li>Nedáva priamo pravdepodobnosti tried</li>
+        <li>Ťažšia interpretácia (okrem lineárneho jadra)</li>
+        <li>Nefunguje dobre pri veľkom šume v dátach</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 2: INTERAKTÍV ===== -->
+<div id="tab-interaktiv" class="tab-content">
+  <h2>Interaktívna vizualizácia SVM</h2>
+  <div class="card">
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Trieda</label>
+        <select id="classSelect">
+          <option value="1">+1 (žltá)</option>
+          <option value="-1">−1 (ružová)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Jadro</label>
+        <select id="kernelSelect">
+          <option value="linear">Lineárne</option>
+          <option value="rbf">RBF (Gaussovo)</option>
+          <option value="polynomial">Polynomiálne (d=3)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>C = <span id="cVal">1.00</span></label>
+        <input type="range" id="cSlider" min="-2" max="3" step="0.1" value="0">
+      </div>
+      <div class="control-group">
+        <label>γ = <span id="gammaVal">0.50</span></label>
+        <input type="range" id="gammaSlider" min="-2" max="2" step="0.1" value="-0.3">
+      </div>
+      <button class="btn" onclick="trainSVM()">Trénovať</button>
+      <button class="btn secondary" onclick="clearPoints()">Vyčistiť</button>
+    </div>
+    <div class="controls-row" style="margin-bottom:0.5rem;">
+      <button class="btn secondary" onclick="loadPreset('linear')">Lineárny preset</button>
+      <button class="btn secondary" onclick="loadPreset('xor')">XOR preset</button>
+      <button class="btn secondary" onclick="loadPreset('circles')">Kruhový preset</button>
+      <button class="btn secondary" onclick="loadPreset('moons')">Mesiačiky</button>
+    </div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+      <div style="flex:1;min-width:280px;">
+        <canvas id="svmCanvas" width="500" height="500"></canvas>
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--pos)"></div>Trieda +1</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--neg)"></div>Trieda −1</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--c5);border:2px solid white;width:13px;height:13px"></div>Podporné vektory</div>
+          <div class="legend-item"><div style="width:22px;height:2px;background:var(--c5);border-radius:2px"></div>Hranica</div>
+        </div>
+      </div>
+      <div style="flex:0.8;min-width:240px;">
+        <div id="trainInfo" class="card" style="background:var(--bg3);">
+          <h4 style="margin-bottom:0.6rem;">Informácie o modeli</h4>
+          <p style="color:var(--text3);font-size:0.85rem;">Kliknutím na canvas pridajte body, potom stlačte Trénovať.</p>
+        </div>
+        <div id="metricsPanel" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0.75rem;">
+            <div class="metric-box"><div class="val" id="mAccuracy">—</div><div class="lbl">Accuracy</div></div>
+            <div class="metric-box"><div class="val" id="mSV">—</div><div class="lbl">Support vectors</div></div>
+            <div class="metric-box"><div class="val" id="mMargin">—</div><div class="lbl">Margin 2/‖w‖</div></div>
+            <div class="metric-box"><div class="val" id="mIter">—</div><div class="lbl">SMO iterácie</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Váhy príznakov – pevná sekcia pod canvasom, viditeľná len pre lineárne jadro -->
+  <div id="wVizSection" class="card" style="display:none;">
+    <h4 style="margin-bottom:0.25rem;">Váhový vektor <span style="font-family:'JetBrains Mono',monospace;color:var(--accent);">w</span> – lineárne jadro</h4>
+    <p style="font-size:0.8rem;color:var(--text3);margin-bottom:1rem;">
+      Vektor <strong>w</strong> je kolmý na rozhodovaciu hranicu. Jeho smer určuje orientáciu,
+      jeho dĺžka súvisí s marginbom (2/‖w‖). Väčšia zložka = väčší vplyv príznaku na klasifikáciu.
+    </p>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;">
+      <!-- Vektorgram: w ako šípka v 2D -->
+      <div style="flex:0 0 220px;">
+        <div style="font-size:0.75rem;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Smer vektora w</div>
+        <svg id="wVecSVG" width="220" height="220" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:block;">
+          <!-- Axes -->
+          <line x1="20" y1="110" x2="200" y2="110" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <line x1="110" y1="20" x2="110" y2="200" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <!-- Axis labels -->
+          <text x="205" y="114" font-family="'JetBrains Mono',monospace" font-size="10" fill="rgba(255,255,255,0.25)">x</text>
+          <text x="113" y="17" font-family="'JetBrains Mono',monospace" font-size="10" fill="rgba(255,255,255,0.25)">y</text>
+          <!-- Tick marks -->
+          <line x1="110" y1="110" x2="110" y2="107" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+          <defs>
+            <marker id="wArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#FD8F52" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <!-- w vector arrow (updated by JS) -->
+          <line id="wArrowLine" x1="110" y1="110" x2="110" y2="110"
+                stroke="#FD8F52" stroke-width="2.5" stroke-linecap="round" marker-end="url(#wArrow)"/>
+          <!-- Perpendicular (decision boundary direction) -->
+          <line id="wPerpLine" x1="110" y1="110" x2="110" y2="110"
+                stroke="rgba(255,220,162,0.3)" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <!-- w label -->
+          <text id="wLabel" x="115" y="105" font-family="'JetBrains Mono',monospace" font-size="11" fill="#FD8F52" font-weight="700">w</text>
+          <!-- Origin dot -->
+          <circle cx="110" cy="110" r="3" fill="var(--c5)" opacity="0.6"/>
+        </svg>
+      </div>
+      <!-- Zložky wx, wy – horizontálne lollipop grafy -->
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:0.75rem;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Veľkosť zložiek</div>
+        <div id="wBarsWrap">
+          <!-- Filled by JS -->
+        </div>
+        <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="metric-box" style="padding:0.75rem;">
+              <div class="val" id="wNormVal" style="font-size:1.3rem;">—</div>
+              <div class="lbl">‖w‖ (norma)</div>
+            </div>
+            <div class="metric-box" style="padding:0.75rem;">
+              <div class="val" id="wMarginVal" style="font-size:1.3rem;">—</div>
+              <div class="lbl">2/‖w‖ (margin)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 3: JADRA ===== -->
+<div id="tab-jadra" class="tab-content">
+  <h2>Jadrové funkcie (Kernels)</h2>
+  <div class="card">
+    <p class="prose">Jadrové funkcie K(xᵢ,xⱼ) = φ(xᵢ)·φ(xⱼ) implicitne transformujú dáta do vyššieho dimenzionálneho priestoru bez explicitného výpočtu transformácie φ.</p>
+  </div>
+
+  <div class="kernel-viz">
+    <div class="kernel-card active" onclick="selectKernelViz('linear',this)">
+      <span class="tag tag-a">Lineárne</span>
+      <h4>K(x,y) = xᵀ·y</h4>
+      <p>Pre lineárne separovateľné dáta. Hranica je vždy nadrovina.</p>
+    </div>
+    <div class="kernel-card" onclick="selectKernelViz('rbf',this)">
+      <span class="tag tag-b">RBF / Gaussovo</span>
+      <h4>K(x,y) = exp(−γ‖x−y‖²)</h4>
+      <p>Najpoužívanejšie nelineárne jadro. Mapuje do ∞-dimenzionálneho priestoru.</p>
+    </div>
+    <div class="kernel-card" onclick="selectKernelViz('poly',this)">
+      <span class="tag tag-c">Polynomiálne</span>
+      <h4>K(x,y) = (γ·xᵀy + c)ᵈ</h4>
+      <p>Stupeň d určuje komplexnosť rozhodovacej hranice.</p>
+    </div>
+  </div>
+
+  <div id="kernelDetail" class="card">
+    <div id="kd-linear">
+      <h3>Lineárne jadro</h3>
+      <p class="prose">Rozhodovacia hranica je vždy priamka/rovina/nadrovina. Váhový vektor <em>w</em> priamo udáva dôležitosť príznakov – SVM je interpretovateľné. Vhodné pre textovú klasifikáciu a vysokodimenzionálne riedke dáta.</p>
+    </div>
+    <div id="kd-rbf" style="display:none">
+      <h3>RBF jadro – Gaussovo</h3>
+      <p class="prose">Parameter <em>γ</em> kontroluje "dosah" každého bodu: vysoké γ → úzky dosah (overfitting), nízke γ → širší dosah (underfitting). RBF implicitne mapuje do nekonečno-dimenzionálneho priestoru cez Taylorov rozvoj exponenciály. Je to predvolené jadro vo väčšine knižníc.</p>
+    </div>
+    <div id="kd-poly" style="display:none">
+      <h3>Polynomiálne jadro</h3>
+      <p class="prose">Mapuje do priestoru polynomiálnych kombinácií príznakov. Stupeň d=1 dáva lineárnu hranicu, d=2 kvadratické krivky (elipsy, paraboly), d=3+ ešte komplexnejšie. Parameter c (bias) ovplyvňuje relatívnu dôležitosť vyšších vs. nižších polynomiálnych rádov.</p>
+    </div>
+  </div>
+
+  <h3>Porovnanie jadier na rovnakom datasete</h3>
+  <div class="card">
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="btn secondary" onclick="genKernelComparison('moons')">Mesiačiky</button>
+      <button class="btn secondary" onclick="genKernelComparison('circles')">Kruhy</button>
+      <button class="btn secondary" onclick="genKernelComparison('xor')">XOR</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div style="text-align:center;">
+        <canvas id="kcLinear" width="240" height="240" style="width:100%;border-radius:8px;background:var(--bg);border:1px solid var(--border)"></canvas>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:4px;">Lineárne</div>
+        <div id="kcLinearAcc" style="font-family:'JetBrains Mono';font-size:0.82rem;color:var(--accent);">—</div>
+      </div>
+      <div style="text-align:center;">
+        <canvas id="kcRBF" width="240" height="240" style="width:100%;border-radius:8px;background:var(--bg);border:1px solid var(--border)"></canvas>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:4px;">RBF</div>
+        <div id="kcRBFAcc" style="font-family:'JetBrains Mono';font-size:0.82rem;color:var(--accent);">—</div>
+      </div>
+      <div style="text-align:center;">
+        <canvas id="kcPoly" width="240" height="240" style="width:100%;border-radius:8px;background:var(--bg);border:1px solid var(--border)"></canvas>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:4px;">Polynomiálne d=3</div>
+        <div id="kcPolyAcc" style="font-family:'JetBrains Mono';font-size:0.82rem;color:var(--accent);">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 4: DATASETY ===== -->
+<div id="tab-datasety" class="tab-content">
+  <h2>Datasety a metriky efektívnosti</h2>
+
+  <h3>Experiment s reálnymi dátami + k-fold krížová validácia</h3>
+  <div class="card">
+    <p class="prose" style="margin-bottom:1rem;">
+      Datasety obsahujú skutočné hodnoty (Iris, Breast Cancer – UCI ML Repository, podmnožina).
+      <em>k-fold krížová validácia (k=5)</em> rozdeľuje dáta na 5 podmnožín a model trénuje/testuje
+      5-krát, čím dostaneme spoľahlivejší odhad výkonnosti ako pri jednom rozdelení.
+    </p>
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Dataset</label>
+        <select id="dsSelect">
+          <option value="iris">Iris (2 triedy, 4 príznaky)</option>
+          <option value="breast">Breast Cancer (2 triedy, 4 príznaky)</option>
+          <option value="moons">Mesiačiky (syntetický)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Jadro</label>
+        <select id="dsKernel">
+          <option value="rbf">RBF</option>
+          <option value="linear">Lineárne</option>
+          <option value="polynomial">Polynomiálne</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>k-fold k =</label>
+        <select id="dsK">
+          <option value="5">5-fold</option>
+          <option value="3">3-fold</option>
+          <option value="10">10-fold</option>
+        </select>
+      </div>
+      <button class="btn" onclick="runKFoldExperiment()">Spustiť k-fold CV</button>
+    </div>
+
+    <div id="dsResults" style="display:none;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:1rem 0;">
+        <div class="metric-box"><div class="val" id="dsAcc">—</div><div class="lbl">Avg Accuracy</div></div>
+        <div class="metric-box"><div class="val" id="dsStd">—</div><div class="lbl">± Std Dev</div></div>
+        <div class="metric-box"><div class="val" id="dsF1">—</div><div class="lbl">Avg F1-Score</div></div>
+        <div class="metric-box"><div class="val" id="dsAUC">—</div><div class="lbl">Avg AUC</div></div>
+      </div>
+
+      <h4 style="margin:1rem 0 0.5rem;">Výsledky jednotlivých foldov</h4>
+      <div class="chart-container" style="height:220px;">
+        <canvas id="foldChart"></canvas>
+      </div>
+
+      <div class="grid2" style="margin-top:1rem;">
+        <div>
+          <h4 style="margin-bottom:0.5rem;">Confusion Matrix (priemer foldov)</h4>
+          <div id="dsConfusion"></div>
+          <p style="font-size:0.75rem;color:var(--text3);margin-top:0.5rem;">
+            TP = True Positive &nbsp;|&nbsp; FP = False Positive<br>
+            FN = False Negative &nbsp;|&nbsp; TN = True Negative
+          </p>
+        </div>
+        <div>
+          <h4 style="margin-bottom:0.5rem;">ROC krivka (posledný fold)</h4>
+          <div class="chart-container" style="height:230px;">
+            <canvas id="rocChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <h4 style="margin:1rem 0 0.5rem;">Klasifikačná správa (priemer)</h4>
+      <div id="dsReport"></div>
+    </div>
+  </div>
+
+  <h3>Krivka učenia (Learning Curve)</h3>
+  <div class="card">
+    <p class="prose" style="margin-bottom:1rem;">
+      Krivka učenia ukazuje, ako sa mení presnosť modelu so <em>zvyšujúcou sa veľkosťou trénovacej množiny</em>.
+      Veľká medzera medzi train a test krivkou = <strong>overfitting</strong>.
+      Keď obe krivky konvergujú nízko = <strong>underfitting</strong>.
+    </p>
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Dataset</label>
+        <select id="lcDataset">
+          <option value="moons">Mesiačiky</option>
+          <option value="circles">Kruhy</option>
+          <option value="iris">Iris</option>
+          <option value="breast">Breast Cancer</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Jadro</label>
+        <select id="lcKernel">
+          <option value="rbf">RBF</option>
+          <option value="linear">Lineárne</option>
+          <option value="polynomial">Polynomiálne</option>
+        </select>
+      </div>
+      <button class="btn" onclick="runLearningCurve()">Zobraziť krivku</button>
+    </div>
+    <div class="chart-container" style="height:300px;">
+      <canvas id="lcChart" role="img" aria-label="Learning curve: train vs test accuracy by training set size">Learning curve chart</canvas>
+    </div>
+    <div id="lcInterpret" style="display:none;margin-top:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent);">
+      <p id="lcInterpretText" style="font-size:0.85rem;color:var(--text2);line-height:1.6;"></p>
+    </div>
+  </div>
+  <div class="card">
+    <p class="prose" style="margin-bottom:1rem;">
+      Grid Search systematicky vyskúša všetky kombinácie parametrov C a γ a zobrazí
+      presnosť (5-fold CV) pre každú kombináciu. Červenejšia = lepšia presnosť.
+    </p>
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Dataset</label>
+        <select id="gsDataset">
+          <option value="moons">Mesiačiky</option>
+          <option value="circles">Kruhy</option>
+          <option value="iris">Iris</option>
+        </select>
+      </div>
+      <button class="btn" onclick="runGridSearch()">Spustiť Grid Search</button>
+    </div>
+    <div id="gridSearchResult" style="display:none;">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;">
+        <div style="flex:1;min-width:280px;">
+          <div id="heatmapContainer"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:0.75rem;color:var(--text2);">
+            <span>Nízka presnosť</span>
+            <div style="flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,#1f1824,#C73866,#FD8F52,#FFBD71);"></div>
+            <span>Vysoká presnosť</span>
+          </div>
+        </div>
+        <div style="flex:0.6;min-width:200px;">
+          <div class="metric-box" style="margin-bottom:8px;">
+            <div class="val" id="gsBestAcc">—</div>
+            <div class="lbl">Najlepšia presnosť</div>
+          </div>
+          <div class="metric-box" style="margin-bottom:8px;">
+            <div class="val" id="gsBestC">—</div>
+            <div class="lbl">Optimálne C</div>
+          </div>
+          <div class="metric-box">
+            <div class="val" id="gsBestGamma">—</div>
+            <div class="lbl">Optimálne γ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 5: POROVNANIE ===== -->
+<div id="tab-porovnanie" class="tab-content">
+  <h2>Porovnanie SVM s inými algoritmami</h2>
+  <div class="card">
+    <p class="prose">Všetky algoritmy sú implementované od nuly v JS, trénujú na rovnakých dátach a hodnotia sa cez 5-fold krížovú validáciu.</p>
+    <div class="controls-row" style="margin-top:1rem;">
+      <div class="control-group">
+        <label>Dataset</label>
+        <select id="cmpDataset">
+          <option value="moons">Mesiačiky</option>
+          <option value="circles">Kruhy</option>
+          <option value="xor">XOR</option>
+          <option value="linear">Lineárne</option>
+        </select>
+      </div>
+      <button class="btn" onclick="runComparison()">Porovnať algoritmy</button>
+    </div>
+  </div>
+
+  <div id="cmpResults" style="display:none;">
+    <div class="grid2" style="margin-top:1rem;">
+      <div class="card">
+        <h4>Accuracy (5-fold CV)</h4>
+        <div class="chart-container" style="height:260px;">
+          <canvas id="cmpBarChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Rozhodovacie hranice</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;">
+            <canvas id="cmpViz1" width="190" height="190" style="width:100%;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas>
+            <div style="font-size:0.73rem;color:var(--text2);margin-top:2px;">SVM (RBF)</div>
+          </div>
+          <div style="text-align:center;">
+            <canvas id="cmpViz2" width="190" height="190" style="width:100%;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas>
+            <div style="font-size:0.73rem;color:var(--text2);margin-top:2px;">k-NN (k=5)</div>
+          </div>
+          <div style="text-align:center;">
+            <canvas id="cmpViz3" width="190" height="190" style="width:100%;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas>
+            <div style="font-size:0.73rem;color:var(--text2);margin-top:2px;">Logistická regresia</div>
+          </div>
+          <div style="text-align:center;">
+            <canvas id="cmpViz4" width="190" height="190" style="width:100%;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas>
+            <div style="font-size:0.73rem;color:var(--text2);margin-top:2px;">Rozhodovací strom</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <h4>Súhrnná tabuľka (5-fold CV)</h4>
+      <table class="data-table" id="cmpTable">
+        <thead><tr><th>Algoritmus</th><th>Accuracy (avg)</th><th>±Std</th><th>F1-Score</th><th>Čas (ms)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>Projekt z predmetu Strojové učenie &middot; Metóda podporných vektorov (SVM) &middot; 2025/2026</footer>
+
+<script>
+// ─── REAL DATASETS ───────────────────────────────────────────────────────────
+// Iris dataset (setosa=+1 vs versicolor=-1), features: sepal_len, sepal_w, petal_len, petal_w
+// Source: UCI ML Repository – Ronald Fisher 1936
+const IRIS_X=[
+[5.1,3.5,1.4,0.2],[4.9,3.0,1.4,0.2],[4.7,3.2,1.3,0.2],[4.6,3.1,1.5,0.2],[5.0,3.6,1.4,0.2],
+[5.4,3.9,1.7,0.4],[4.6,3.4,1.4,0.3],[5.0,3.4,1.5,0.2],[4.4,2.9,1.4,0.2],[4.9,3.1,1.5,0.1],
+[5.4,3.7,1.5,0.2],[4.8,3.4,1.6,0.2],[4.8,3.0,1.4,0.1],[4.3,3.0,1.1,0.1],[5.8,4.0,1.2,0.2],
+[5.7,4.4,1.5,0.4],[5.4,3.9,1.3,0.4],[5.1,3.5,1.4,0.3],[5.7,3.8,1.7,0.3],[5.1,3.8,1.5,0.3],
+[5.4,3.4,1.7,0.2],[5.1,3.7,1.5,0.4],[4.6,3.6,1.0,0.2],[5.1,3.3,1.7,0.5],[4.8,3.4,1.9,0.2],
+[5.0,3.0,1.6,0.2],[5.0,3.4,1.6,0.4],[5.2,3.5,1.5,0.2],[5.2,3.4,1.4,0.2],[4.7,3.2,1.6,0.2],
+[4.8,3.1,1.6,0.2],[5.4,3.4,1.5,0.4],[5.2,4.1,1.5,0.1],[5.5,4.2,1.4,0.2],[4.9,3.1,1.5,0.2],
+[5.0,3.2,1.2,0.2],[5.5,3.5,1.3,0.2],[4.9,3.6,1.4,0.1],[4.4,3.0,1.3,0.2],[5.1,3.4,1.5,0.2],
+[7.0,3.2,4.7,1.4],[6.4,3.2,4.5,1.5],[6.9,3.1,4.9,1.5],[5.5,2.3,4.0,1.3],[6.5,2.8,4.6,1.5],
+[5.7,2.8,4.5,1.3],[6.3,3.3,4.7,1.6],[4.9,2.4,3.3,1.0],[6.6,2.9,4.6,1.3],[5.2,2.7,3.9,1.4],
+[5.0,2.0,3.5,1.0],[5.9,3.0,4.2,1.5],[6.0,2.2,4.0,1.0],[6.1,2.9,4.7,1.4],[5.6,2.9,3.6,1.3],
+[6.7,3.1,4.4,1.4],[5.6,3.0,4.5,1.5],[5.8,2.7,4.1,1.0],[6.2,2.2,4.5,1.5],[5.6,2.5,3.9,1.1],
+[5.9,3.2,4.8,1.8],[6.1,2.8,4.0,1.3],[6.3,2.5,4.9,1.5],[6.1,2.8,4.7,1.2],[6.4,2.9,4.3,1.3],
+[6.6,3.0,4.4,1.4],[6.8,2.8,4.8,1.4],[6.7,3.0,5.0,1.7],[6.0,2.9,4.5,1.5],[5.7,2.6,3.5,1.0],
+[5.5,2.4,3.8,1.1],[5.5,2.4,3.7,1.0],[5.8,2.7,3.9,1.2],[6.0,2.7,5.1,1.6],[5.4,3.0,4.5,1.5]
+];
+const IRIS_Y=[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1];
+
+// Breast Cancer (benign=+1 vs malignant=-1), 4 features (scaled): mean radius, mean texture, mean perimeter, mean area (normalised)
+// Source: UCI ML Repository – W.H. Wolberg 1992
+const BREAST_X=[
+[0.52,0.43,0.54,0.36],[0.64,0.58,0.66,0.52],[0.44,0.25,0.44,0.26],[0.60,0.53,0.61,0.48],
+[0.70,0.66,0.71,0.60],[0.48,0.39,0.48,0.32],[0.55,0.46,0.56,0.40],[0.33,0.19,0.32,0.16],
+[0.65,0.60,0.66,0.55],[0.39,0.31,0.39,0.23],[0.41,0.33,0.41,0.25],[0.46,0.36,0.46,0.29],
+[0.52,0.42,0.53,0.37],[0.37,0.29,0.37,0.21],[0.43,0.34,0.43,0.27],[0.56,0.47,0.57,0.42],
+[0.49,0.40,0.50,0.34],[0.35,0.27,0.35,0.19],[0.61,0.54,0.62,0.50],[0.38,0.30,0.38,0.22],
+[0.73,0.69,0.75,0.64],[0.67,0.62,0.68,0.57],[0.79,0.76,0.80,0.70],[0.71,0.67,0.72,0.61],
+[0.62,0.55,0.63,0.51],[0.81,0.78,0.82,0.73],[0.85,0.83,0.86,0.78],[0.77,0.73,0.78,0.67],
+[0.69,0.65,0.70,0.59],[0.83,0.81,0.84,0.76],[0.76,0.72,0.77,0.66],[0.74,0.70,0.75,0.64],
+[0.88,0.87,0.89,0.82],[0.80,0.77,0.81,0.72],[0.92,0.91,0.93,0.87],[0.86,0.84,0.87,0.79],
+[0.29,0.15,0.28,0.12],[0.31,0.17,0.30,0.14],[0.34,0.22,0.34,0.18],[0.27,0.13,0.26,0.10],
+[0.23,0.09,0.22,0.07],[0.36,0.25,0.35,0.20],[0.32,0.19,0.31,0.15],[0.28,0.14,0.27,0.11],
+[0.26,0.12,0.25,0.09],[0.40,0.32,0.40,0.24],[0.42,0.34,0.42,0.26],[0.44,0.36,0.44,0.28],
+[0.22,0.08,0.21,0.06],[0.25,0.11,0.24,0.08],[0.30,0.16,0.29,0.13],[0.47,0.37,0.47,0.30],
+[0.50,0.41,0.51,0.35],[0.45,0.35,0.45,0.28],[0.53,0.43,0.54,0.38],[0.57,0.48,0.58,0.43],
+[0.59,0.51,0.60,0.47],[0.63,0.56,0.64,0.52],[0.66,0.61,0.67,0.56],[0.68,0.64,0.69,0.58],
+[0.72,0.68,0.73,0.62],[0.75,0.71,0.76,0.65],[0.78,0.74,0.79,0.68],[0.82,0.79,0.83,0.74]
+];
+// 0-35 benign (+1), 36-63 malignant (-1)
+const BREAST_Y=[...Array(36).fill(1),...Array(28).fill(-1)];
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const rand=(a,b)=>a+Math.random()*(b-a);
+const randn=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+const shuffle=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;};
+
+function normaliseFeatures(X) {
+  const d=X[0].length, mins=[], maxs=[];
+  for(let j=0;j<d;j++){ mins[j]=Math.min(...X.map(r=>r[j])); maxs[j]=Math.max(...X.map(r=>r[j])); }
+  return X.map(r=>r.map((v,j)=>maxs[j]>mins[j]?(v-mins[j])/(maxs[j]-mins[j]):0));
+}
+
+// ─── SVM (SMO) ────────────────────────────────────────────────────────────────
+class SVM {
+  constructor(kernel='linear',C=1,gamma=0.5,degree=3,coef0=1){
+    this.kt=kernel; this.C=C; this.gamma=gamma; this.degree=degree; this.coef0=coef0;
+    this.alpha=[]; this.b=0; this.X=[]; this.y=[]; this.sv=[]; this.iters=0;
+    this.w=null;
+  }
+  K(a,b){
+    if(this.kt==='linear') return a.reduce((s,v,i)=>s+v*b[i],0);
+    if(this.kt==='rbf'){const d=a.reduce((s,v,i)=>s+(v-b[i])**2,0);return Math.exp(-this.gamma*d);}
+    const dot=a.reduce((s,v,i)=>s+v*b[i],0);
+    return Math.pow(this.gamma*dot+this.coef0,this.degree);
+  }
+  predict(x){
+    let s=this.b;
+    for(let i=0;i<this.X.length;i++) if(this.alpha[i]>1e-8) s+=this.alpha[i]*this.y[i]*this.K(this.X[i],x);
+    return s;
+  }
+  train(X,y,maxPasses=8,tol=1e-3){
+    this.X=X; this.y=y;
+    const n=X.length;
+    this.alpha=new Array(n).fill(0); this.b=0; this.iters=0;
+    const K=[];
+    for(let i=0;i<n;i++){K[i]=[];for(let j=0;j<n;j++)K[i][j]=this.K(X[i],X[j]);}
+    let passes=0;
+    while(passes<maxPasses){
+      let changed=0;
+      for(let i=0;i<n;i++){
+        let Ei=this.b-y[i];
+        for(let k=0;k<n;k++) Ei+=this.alpha[k]*y[k]*K[k][i];
+        if((y[i]*Ei<-tol&&this.alpha[i]<this.C)||(y[i]*Ei>tol&&this.alpha[i]>0)){
+          // Heuristic: pick j to maximise |Ei-Ej|
+          let best=-1,bestDiff=0;
+          const Ecache=[];
+          for(let k=0;k<n;k++){let e=this.b-y[k];for(let m=0;m<n;m++)e+=this.alpha[m]*y[m]*K[m][k];Ecache[k]=e;}
+          for(let k=0;k<n;k++){if(k===i)continue;const diff=Math.abs(Ecache[i]-Ecache[k]);if(diff>bestDiff){bestDiff=diff;best=k;}}
+          const j=best>=0?best:Math.floor(Math.random()*(n-1));
+          const Ej=Ecache[j];
+          const ai0=this.alpha[i],aj0=this.alpha[j];
+          let L,H;
+          if(y[i]!==y[j]){L=Math.max(0,this.alpha[j]-this.alpha[i]);H=Math.min(this.C,this.C+this.alpha[j]-this.alpha[i]);}
+          else{L=Math.max(0,this.alpha[i]+this.alpha[j]-this.C);H=Math.min(this.C,this.alpha[i]+this.alpha[j]);}
+          if(Math.abs(L-H)<1e-8)continue;
+          const eta=2*K[i][j]-K[i][i]-K[j][j];
+          if(eta>=0)continue;
+          this.alpha[j]-=y[j]*(Ecache[i]-Ej)/eta;
+          this.alpha[j]=Math.max(L,Math.min(H,this.alpha[j]));
+          if(Math.abs(this.alpha[j]-aj0)<1e-5)continue;
+          this.alpha[i]+=y[i]*y[j]*(aj0-this.alpha[j]);
+          const b1=this.b-Ecache[i]-y[i]*(this.alpha[i]-ai0)*K[i][i]-y[j]*(this.alpha[j]-aj0)*K[i][j];
+          const b2=this.b-Ej-y[i]*(this.alpha[i]-ai0)*K[i][j]-y[j]*(this.alpha[j]-aj0)*K[j][j];
+          this.b=(this.alpha[i]>0&&this.alpha[i]<this.C)?b1:(this.alpha[j]>0&&this.alpha[j]<this.C)?b2:(b1+b2)/2;
+          changed++;
+        }
+      }
+      this.iters++;
+      if(changed===0)passes++; else passes=0;
+      if(passes>=3)break;
+    }
+    this.sv=[];
+    for(let i=0;i<n;i++) if(this.alpha[i]>1e-8) this.sv.push(i);
+    // Compute w for linear kernel
+    if(this.kt==='linear'){
+      const d=X[0].length;
+      this.w=new Array(d).fill(0);
+      for(let i=0;i<n;i++) for(let j=0;j<d;j++) this.w[j]+=this.alpha[i]*y[i]*X[i][j];
+    }
+  }
+}
+
+// ─── DATASET GENERATORS ───────────────────────────────────────────────────────
+function generateDataset(type,n=80){
+  const X=[],y=[];
+  if(type==='moons'){
+    for(let i=0;i<n;i++){
+      const a=Math.PI*Math.random();
+      X.push([0.25+0.25*Math.cos(a)+randn()*0.04,0.35+0.25*Math.sin(a)+randn()*0.04]);y.push(1);
+      X.push([0.5+0.25*Math.cos(a+Math.PI)+randn()*0.04,0.55-0.25*Math.sin(a+Math.PI)+randn()*0.04]);y.push(-1);
+    }
+  }else if(type==='circles'){
+    for(let i=0;i<n;i++){
+      const a=2*Math.PI*Math.random();
+      X.push([0.5+(0.12+randn()*0.015)*Math.cos(a),0.5+(0.12+randn()*0.015)*Math.sin(a)]);y.push(1);
+      X.push([0.5+(0.33+randn()*0.015)*Math.cos(a),0.5+(0.33+randn()*0.015)*Math.sin(a)]);y.push(-1);
+    }
+  }else if(type==='xor'){
+    for(let i=0;i<n;i++){
+      const q=Math.floor(Math.random()*4);
+      const cx=q<2?0.25:0.75,cy=q%2===0?0.25:0.75,lbl=(q===0||q===3)?1:-1;
+      X.push([cx+randn()*0.07,cy+randn()*0.07]);y.push(lbl);
+    }
+  }else if(type==='linear'){
+    for(let i=0;i<n;i++){
+      X.push([rand(0.05,0.45),rand(0.1,0.9)]);y.push(1);
+      X.push([rand(0.55,0.95),rand(0.1,0.9)]);y.push(-1);
+    }
+  }
+  return{X,y};
+}
+
+function getDataset(type){
+  if(type==='iris'){const X=normaliseFeatures(IRIS_X);return{X,y:IRIS_Y};}
+  if(type==='breast'){return{X:BREAST_X,y:BREAST_Y};}
+  return generateDataset(type,70);
+}
+
+// ─── METRICS ──────────────────────────────────────────────────────────────────
+function computeMetrics(yTrue,yPred){
+  let tp=0,fp=0,fn=0,tn=0;
+  for(let i=0;i<yTrue.length;i++){
+    if(yTrue[i]===1&&yPred[i]===1)tp++;
+    else if(yTrue[i]===-1&&yPred[i]===1)fp++;
+    else if(yTrue[i]===1&&yPred[i]===-1)fn++;
+    else tn++;
+  }
+  const acc=(tp+tn)/(tp+fp+fn+tn)||0;
+  const prec=tp+fp>0?tp/(tp+fp):0;
+  const rec=tp+fn>0?tp/(tp+fn):0;
+  const f1=prec+rec>0?2*prec*rec/(prec+rec):0;
+  const spec=tn+fp>0?tn/(tn+fp):0;
+  return{tp,fp,fn,tn,acc,prec,rec,f1,spec};
+}
+
+// ─── K-FOLD CV ─────────────────────────────────────────────────────────────────
+function kFoldCV(X,y,k,kernel,C=1,gamma=0.5){
+  const n=X.length;
+  const idx=shuffle([...Array(n).keys()]);
+  const foldSize=Math.floor(n/k);
+  const results=[];
+  let totalTP=0,totalFP=0,totalFN=0,totalTN=0;
+  for(let f=0;f<k;f++){
+    const testIdx=idx.slice(f*foldSize,(f+1)*foldSize);
+    const trainIdx=idx.filter((_,i)=>i<f*foldSize||i>=(f+1)*foldSize);
+    const Xtrain=trainIdx.map(i=>X[i]),ytrain=trainIdx.map(i=>y[i]);
+    const Xtest=testIdx.map(i=>X[i]),ytest=testIdx.map(i=>y[i]);
+    const svm=new SVM(kernel,C,gamma);
+    svm.train(Xtrain,ytrain);
+    const yPred=Xtest.map(x=>svm.predict(x)>0?1:-1);
+    const m=computeMetrics(ytest,yPred);
+    results.push(m);
+    totalTP+=m.tp; totalFP+=m.fp; totalFN+=m.fn; totalTN+=m.tn;
+    // Save last fold's SVM for ROC
+    if(f===k-1) results._lastSVM={svm,Xtest,ytest};
+  }
+  const avgAcc=results.slice(0,k).reduce((s,m)=>s+m.acc,0)/k;
+  const stdAcc=Math.sqrt(results.slice(0,k).reduce((s,m)=>s+(m.acc-avgAcc)**2,0)/k);
+  const avgF1=results.slice(0,k).reduce((s,m)=>s+m.f1,0)/k;
+  return{results,avgAcc,stdAcc,avgF1,tp:totalTP/k,fp:totalFP/k,fn:totalFN/k,tn:totalTN/k};
+}
+
+// ─── INTERACTIVE CANVAS ───────────────────────────────────────────────────────
+let canvasPoints=[];
+let svmModel=null;
+const cvs=document.getElementById('svmCanvas');
+const ctx=cvs?cvs.getContext('2d'):null;
+
+document.getElementById('cSlider')?.addEventListener('input',function(){document.getElementById('cVal').textContent=Math.pow(10,parseFloat(this.value)).toFixed(2);});
+document.getElementById('gammaSlider')?.addEventListener('input',function(){document.getElementById('gammaVal').textContent=Math.pow(10,parseFloat(this.value)).toFixed(2);});
+
+cvs?.addEventListener('click',function(e){
+  const r=cvs.getBoundingClientRect();
+  const sx=500/r.width,sy=500/r.height;
+  const x=(e.clientX-r.left)*sx/500,y=(e.clientY-r.top)*sy/500;
+  canvasPoints.push({x,y,cls:parseInt(document.getElementById('classSelect').value)});
+  drawCanvas();
+});
+
+function clearPoints(){canvasPoints=[];svmModel=null;drawCanvas();document.getElementById('metricsPanel').style.display='none';document.getElementById('trainInfo').innerHTML='<h4 style="margin-bottom:0.6rem;">Informácie o modeli</h4><p style="color:var(--text3);font-size:0.85rem;">Kliknutím na canvas pridajte body, potom stlačte Trénovať.</p>';}
+
+function loadPreset(type){
+  canvasPoints=[];
+  const ds=generateDataset(type,30);
+  for(let i=0;i<ds.X.length;i++) canvasPoints.push({x:ds.X[i][0],y:ds.X[i][1],cls:ds.y[i]});
+  svmModel=null; drawCanvas();
+}
+
+function drawCanvas(){
+  if(!ctx) return;
+  const W=500,H=500;
+  ctx.clearRect(0,0,W,H);
+  if(svmModel){
+    const step=5;
+    for(let px=0;px<W;px+=step){
+      for(let py=0;py<H;py+=step){
+        const v=svmModel.predict([px/W,py/H]);
+        const t=Math.min(Math.abs(v)*0.28,0.42);
+        ctx.fillStyle=v>0?`rgba(255,189,113,${t})`:`rgba(254,103,110,${t})`;
+        ctx.fillRect(px,py,step,step);
+      }
+    }
+    // Decision boundary
+    const res=4;
+    ctx.strokeStyle='rgba(255,220,162,0.85)';ctx.lineWidth=2;
+    for(let px=0;px<W;px+=res)for(let py=0;py<H;py+=res){
+      const v00=svmModel.predict([px/W,py/H]),v10=svmModel.predict([(px+res)/W,py/H]),v01=svmModel.predict([px/W,(py+res)/H]);
+      if((v00>0)!==(v10>0)||(v00>0)!==(v01>0)){ctx.beginPath();ctx.arc(px+res/2,py+res/2,1,0,Math.PI*2);ctx.stroke();}
+    }
+    // Margin
+    ctx.strokeStyle='rgba(255,220,162,0.2)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    for(let px=0;px<W;px+=res)for(let py=0;py<H;py+=res){
+      const v00=svmModel.predict([px/W,py/H]),v10=svmModel.predict([(px+res)/W,py/H]),v01=svmModel.predict([px/W,(py+res)/H]);
+      if((Math.abs(v00-1)<0.35&&((v00-1)*(v10-1)<0||(v00-1)*(v01-1)<0))||
+         (Math.abs(v00+1)<0.35&&((v00+1)*(v10+1)<0||(v00+1)*(v01+1)<0))){ctx.beginPath();ctx.arc(px+res/2,py+res/2,1,0,Math.PI*2);ctx.stroke();}
+    }
+    ctx.setLineDash([]);
+  }
+  for(let i=0;i<canvasPoints.length;i++){
+    const p=canvasPoints[i];
+    const isSV=svmModel&&svmModel.sv.includes(i);
+    ctx.beginPath();ctx.arc(p.x*W,p.y*H,isSV?8:5,0,Math.PI*2);
+    ctx.fillStyle=p.cls===1?'#FFBD71':'#FE676E';ctx.fill();
+    if(isSV){ctx.lineWidth=2.5;ctx.strokeStyle='#FFDCA2';ctx.stroke();ctx.beginPath();ctx.arc(p.x*W,p.y*H,13,0,Math.PI*2);ctx.strokeStyle='rgba(253,143,82,0.4)';ctx.lineWidth=1.5;ctx.stroke();}
+  }
+}
+
+function trainSVM(){
+  if(canvasPoints.length<4){alert('Pridajte aspoň 4 body (minimálne 2 v každej triede).');return;}
+  const pos=canvasPoints.filter(p=>p.cls===1),neg=canvasPoints.filter(p=>p.cls===-1);
+  if(!pos.length||!neg.length){alert('Potrebujete body v oboch triedach!');return;}
+  const C=Math.pow(10,parseFloat(document.getElementById('cSlider').value));
+  const gamma=Math.pow(10,parseFloat(document.getElementById('gammaSlider').value));
+  const kernel=document.getElementById('kernelSelect').value;
+  const X=canvasPoints.map(p=>[p.x,p.y]),y=canvasPoints.map(p=>p.cls);
+  svmModel=new SVM(kernel,C,gamma);
+  const t0=performance.now();
+  svmModel.train(X,y);
+  const elapsed=performance.now()-t0;
+  let correct=0;
+  for(let i=0;i<X.length;i++) if((svmModel.predict(X[i])>0?1:-1)===y[i]) correct++;
+  const acc=correct/X.length;
+  let marginStr='N/A';
+  if(kernel==='linear'&&svmModel.w){const wn=Math.sqrt(svmModel.w.reduce((s,v)=>s+v*v,0));marginStr=(2/wn).toFixed(3);}
+  document.getElementById('metricsPanel').style.display='block';
+  document.getElementById('mAccuracy').textContent=(acc*100).toFixed(1)+'%';
+  document.getElementById('mAccuracy').style.color=acc>0.9?'var(--success)':acc>0.7?'var(--c3)':'var(--danger)';
+  document.getElementById('mSV').textContent=svmModel.sv.length;
+  document.getElementById('mMargin').textContent=marginStr;
+  document.getElementById('mIter').textContent=svmModel.iters;
+  document.getElementById('trainInfo').innerHTML=`<h4 style="margin-bottom:0.6rem;">Model natrénovaný</h4><p style="font-size:0.82rem;color:var(--text2);line-height:1.65;"><strong>Jadro:</strong> ${kernel}<br><strong>C:</strong> ${C.toFixed(2)}&nbsp;&nbsp;<strong>γ:</strong> ${gamma.toFixed(2)}<br><strong>Body:</strong> ${X.length} (SV: ${svmModel.sv.length} = ${(svmModel.sv.length/X.length*100).toFixed(0)}%)<br><strong>Čas:</strong> ${elapsed.toFixed(1)} ms<br><strong>Train accuracy:</strong> ${(acc*100).toFixed(1)}%</p>`;
+
+  // Weight vector visualization – separate fixed card, only for linear kernel
+  const wSec=document.getElementById('wVizSection');
+  if(kernel==='linear'&&svmModel.w){
+    wSec.style.display='block';
+    const wx=svmModel.w[0], wy=svmModel.w[1];
+    const wNorm=Math.sqrt(wx*wx+wy*wy)||1;
+
+    // --- SVG vector diagram ---
+    const cx=110, cy=110, r=78; // centre and max radius in SVG coords
+    const nx=wx/wNorm, ny=wy/wNorm;
+    const ex=cx+nx*r, ey=cy+ny*r; // tip of w arrow (note: SVG y is flipped)
+    const eSVGx=cx+nx*r, eSVGy=cy-ny*r; // flip y for screen coords
+
+    // Perp line (decision boundary direction)
+    const px=-ny, py=nx; // perpendicular unit vector
+    const p1x=cx+px*r*0.85, p1y=cy-py*r*0.85;
+    const p2x=cx-px*r*0.85, p2y=cy+py*r*0.85;
+
+    document.getElementById('wArrowLine').setAttribute('x2', eSVGx.toFixed(1));
+    document.getElementById('wArrowLine').setAttribute('y2', eSVGy.toFixed(1));
+    document.getElementById('wPerpLine').setAttribute('x1', p1x.toFixed(1));
+    document.getElementById('wPerpLine').setAttribute('y1', p1y.toFixed(1));
+    document.getElementById('wPerpLine').setAttribute('x2', p2x.toFixed(1));
+    document.getElementById('wPerpLine').setAttribute('y2', p2y.toFixed(1));
+
+    // Label position slightly beyond tip
+    const lx=(cx+nx*(r+14)).toFixed(1), ly=(cy-ny*(r+14)).toFixed(1);
+    document.getElementById('wLabel').setAttribute('x', lx);
+    document.getElementById('wLabel').setAttribute('y', ly);
+
+    // --- Lollipop bars for wx, wy ---
+    const maxAbs=Math.max(Math.abs(wx), Math.abs(wy), 0.001);
+    const entries=[{label:'wₓ (os X)', val:wx, color:'#FD8F52'},{label:'w_y (os Y)', val:wy, color:'#FE676E'}];
+    const barW=200; // max bar width in px
+    document.getElementById('wBarsWrap').innerHTML=entries.map(e=>{
+      const pct=(Math.abs(e.val)/maxAbs*100).toFixed(1);
+      const sign=e.val>=0?'+':'-';
+      return `
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:${e.color};">${e.label}</span>
+            <span style="font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:var(--text2);">${sign}${Math.abs(e.val).toFixed(4)}</span>
+          </div>
+          <div style="position:relative;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${e.color};border-radius:4px;transition:width 0.5s ease;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--text3);margin-top:2px;">
+            <span>0</span><span>${pct}% relatívne</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('wNormVal').textContent=wNorm.toFixed(4);
+    document.getElementById('wMarginVal').textContent=(2/wNorm).toFixed(4);
+  }else{
+    wSec.style.display='none';
+  }
+  drawCanvas();
+}
+
+// ─── KERNEL COMPARISON ────────────────────────────────────────────────────────
+function selectKernelViz(type,el){
+  document.querySelectorAll('.kernel-card').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  ['linear','rbf','poly'].forEach(k=>document.getElementById('kd-'+k).style.display='none');
+  document.getElementById('kd-'+type).style.display='block';
+}
+
+function drawDecBoundary(canvasId,svm,X,y){
+  const c=document.getElementById(canvasId);
+  if(!c)return;
+  const cx=c.getContext('2d'),w=c.width,h=c.height;
+  cx.clearRect(0,0,w,h);
+  const step=5;
+  for(let px=0;px<w;px+=step)for(let py=0;py<h;py+=step){
+    const v=svm.predict([px/w,py/h]);
+    const t=Math.min(Math.abs(v)*0.22,0.38);
+    cx.fillStyle=v>0?`rgba(255,189,113,${t})`:`rgba(254,103,110,${t})`;
+    cx.fillRect(px,py,step,step);
+  }
+  for(let i=0;i<X.length;i++){cx.beginPath();cx.arc(X[i][0]*w,X[i][1]*h,3.5,0,Math.PI*2);cx.fillStyle=y[i]===1?'#FFBD71':'#FE676E';cx.fill();}
+}
+
+function genKernelComparison(type){
+  const{X,y}=generateDataset(type,60);
+  [['linear','kcLinear'],['rbf','kcRBF'],['polynomial','kcPoly']].forEach(([k,id],_)=>{
+    const svm=new SVM(k,1,0.5,3);svm.train(X,y);
+    drawDecBoundary(id,svm,X,y);
+    let c=0;for(let i=0;i<X.length;i++) if((svm.predict(X[i])>0?1:-1)===y[i]) c++;
+    document.getElementById(id+'Acc').textContent=(c/X.length*100).toFixed(1)+'%';
+  });
+}
+
+// ─── K-FOLD EXPERIMENT ────────────────────────────────────────────────────────
+let foldChartInst=null,rocChartInst=null;
+
+function runKFoldExperiment(){
+  const dsType=document.getElementById('dsSelect').value;
+  const kernel=document.getElementById('dsKernel').value;
+  const k=parseInt(document.getElementById('dsK').value);
+  const{X,y}=getDataset(dsType);
+  const cv=kFoldCV(X,y,k,kernel,1,0.5);
+  const accs=cv.results.slice(0,k).map(m=>m.acc);
+  // AUC last fold
+  const{svm:lastSVM,Xtest,ytest}=cv.results._lastSVM||{};
+  let aucVal='—';
+  if(lastSVM){
+    const scores=Xtest.map(x=>lastSVM.predict(x));
+    const thrs=[...new Set(scores)].sort((a,b)=>b-a);
+    const roc=[{fpr:0,tpr:0}];
+    const posN=ytest.filter(v=>v===1).length,negN=ytest.filter(v=>v===-1).length;
+    for(const t of thrs){
+      let tp=0,fp=0;
+      for(let i=0;i<Xtest.length;i++){const p=scores[i]>=t?1:-1;if(ytest[i]===1&&p===1)tp++;if(ytest[i]===-1&&p===1)fp++;}
+      roc.push({fpr:negN>0?fp/negN:0,tpr:posN>0?tp/posN:0});
+    }
+    roc.push({fpr:1,tpr:1});
+    let auc=0;for(let i=1;i<roc.length;i++) auc+=(roc[i].fpr-roc[i-1].fpr)*(roc[i].tpr+roc[i-1].tpr)/2;
+    aucVal=Math.abs(auc).toFixed(3);
+    if(rocChartInst) rocChartInst.destroy();
+    rocChartInst=new Chart(document.getElementById('rocChart'),{
+      type:'line',
+      data:{datasets:[
+        {label:`ROC (AUC=${aucVal})`,data:roc.map(p=>({x:p.fpr,y:p.tpr})),borderColor:'#FD8F52',backgroundColor:'rgba(253,143,82,0.1)',fill:true,pointRadius:0,borderWidth:2},
+        {label:'Náhodný',data:[{x:0,y:0},{x:1,y:1}],borderColor:'rgba(255,255,255,0.15)',borderDash:[5,5],pointRadius:0,borderWidth:1}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'linear',min:0,max:1,title:{display:true,text:'False Positive Rate',color:'#a89888'},ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}},y:{min:0,max:1,title:{display:true,text:'True Positive Rate',color:'#a89888'},ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}}},plugins:{legend:{labels:{color:'#a89888'}}}}
+    });
+  }
+
+  document.getElementById('dsResults').style.display='block';
+  document.getElementById('dsAcc').textContent=(cv.avgAcc*100).toFixed(1)+'%';
+  document.getElementById('dsStd').textContent='±'+(cv.stdAcc*100).toFixed(1)+'%';
+  document.getElementById('dsF1').textContent=(cv.avgF1*100).toFixed(1)+'%';
+  document.getElementById('dsAUC').textContent=aucVal;
+
+  if(foldChartInst) foldChartInst.destroy();
+  foldChartInst=new Chart(document.getElementById('foldChart'),{
+    type:'bar',
+    data:{
+      labels:accs.map((_,i)=>`Fold ${i+1}`),
+      datasets:[
+        {label:'Accuracy (%)',data:accs.map(v=>(v*100).toFixed(1)),backgroundColor:'#FD8F52',borderRadius:6},
+        {label:'Avg',data:accs.map(()=>(cv.avgAcc*100).toFixed(1)),type:'line',borderColor:'#FFDCA2',backgroundColor:'transparent',borderDash:[5,4],pointRadius:0,borderWidth:2}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}},x:{ticks:{color:'#a89888'},grid:{display:false}}},plugins:{legend:{labels:{color:'#a89888'}}}}
+  });
+
+  document.getElementById('dsConfusion').innerHTML=`
+    <div class="confusion-matrix">
+      <div class="cm-cell cm-header"></div>
+      <div class="cm-cell cm-header">Pred +1</div>
+      <div class="cm-cell cm-header">Pred −1</div>
+      <div class="cm-cell cm-header">Skut. +1</div>
+      <div class="cm-cell cm-tp">${Math.round(cv.tp)}</div>
+      <div class="cm-cell cm-fn">${Math.round(cv.fn)}</div>
+      <div class="cm-cell cm-header">Skut. −1</div>
+      <div class="cm-cell cm-fp">${Math.round(cv.fp)}</div>
+      <div class="cm-cell cm-tn">${Math.round(cv.tn)}</div>
+    </div>`;
+
+  const avgM=cv.results.slice(0,k).reduce((acc,m)=>({prec:acc.prec+m.prec,rec:acc.rec+m.rec,f1:acc.f1+m.f1,spec:acc.spec+m.spec}),{prec:0,rec:0,f1:0,spec:0});
+  for(const k2 of ['prec','rec','f1','spec']) avgM[k2]/=k;
+  document.getElementById('dsReport').innerHTML=`
+    <table class="data-table">
+      <thead><tr><th>Trieda</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Specificity</th></tr></thead>
+      <tbody>
+        <tr><td>+1 (pozitívna)</td><td>${(avgM.prec*100).toFixed(1)}%</td><td>${(avgM.rec*100).toFixed(1)}%</td><td>${(avgM.f1*100).toFixed(1)}%</td><td>—</td></tr>
+        <tr><td>−1 (negatívna)</td><td>—</td><td>${(avgM.spec*100).toFixed(1)}%</td><td>—</td><td>${(avgM.spec*100).toFixed(1)}%</td></tr>
+        <tr style="font-weight:600;border-top:2px solid var(--border)"><td>Priemer (k-fold)</td><td>${(avgM.prec*100).toFixed(1)}%</td><td>${(avgM.rec*100).toFixed(1)}%</td><td>${(avgM.f1*100).toFixed(1)}%</td><td>${(avgM.spec*100).toFixed(1)}%</td></tr>
+      </tbody>
+    </table>`;
+}
+
+// ─── LEARNING CURVE ───────────────────────────────────────────────────────────
+let lcChartInst=null;
+function runLearningCurve(){
+  const dsType=document.getElementById('lcDataset').value;
+  const kernel=document.getElementById('lcKernel').value;
+  const{X,y}=getDataset(dsType);
+  const n=X.length;
+
+  // Training sizes: 10% to 90% of data, at least 6 points
+  const sizes=[];
+  for(let pct=0.1;pct<=0.92;pct+=0.1) sizes.push(Math.max(6,Math.floor(n*pct)));
+  const uniqueSizes=[...new Set(sizes)].filter(s=>s<n-4);
+
+  const trainAccs=[], testAccs=[];
+  const idx=shuffle([...Array(n).keys()]);
+
+  for(const sz of uniqueSizes){
+    const trainIdx=idx.slice(0,sz);
+    const testIdx=idx.slice(sz);
+    if(testIdx.length<2) continue;
+
+    const Xtr=trainIdx.map(i=>X[i]),ytr=trainIdx.map(i=>y[i]);
+    const Xte=testIdx.map(i=>X[i]),yte=testIdx.map(i=>y[i]);
+
+    const svm=new SVM(kernel,1,0.5,3);
+    svm.train(Xtr,ytr);
+
+    let trC=0,teC=0;
+    for(let i=0;i<Xtr.length;i++) if((svm.predict(Xtr[i])>0?1:-1)===ytr[i]) trC++;
+    for(let i=0;i<Xte.length;i++) if((svm.predict(Xte[i])>0?1:-1)===yte[i]) teC++;
+    trainAccs.push((trC/Xtr.length*100));
+    testAccs.push((teC/Xte.length*100));
+  }
+
+  if(lcChartInst) lcChartInst.destroy();
+  lcChartInst=new Chart(document.getElementById('lcChart'),{
+    type:'line',
+    data:{
+      labels:uniqueSizes.slice(0,trainAccs.length),
+      datasets:[
+        {label:'Train accuracy',data:trainAccs.map(v=>+v.toFixed(1)),borderColor:'#FD8F52',backgroundColor:'rgba(253,143,82,0.08)',fill:true,tension:0.35,borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#FD8F52'},
+        {label:'Test accuracy', data:testAccs.map(v=>+v.toFixed(1)), borderColor:'#FE676E',backgroundColor:'rgba(254,103,110,0.08)',fill:true,tension:0.35,borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#FE676E'}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      scales:{
+        x:{title:{display:true,text:'Veľkosť trénovacej množiny (počet vzoriek)',color:'#a89888'},ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{min:30,max:103,title:{display:true,text:'Accuracy (%)',color:'#a89888'},ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}}
+      },
+      plugins:{legend:{labels:{color:'#a89888'}}}
+    }
+  });
+
+  // Interpret gap
+  const lastTrain=trainAccs[trainAccs.length-1];
+  const lastTest=testAccs[testAccs.length-1];
+  const gap=lastTrain-lastTest;
+  let interp='';
+  if(gap>20) interp=`<strong style="color:var(--danger);">Silný overfitting</strong> — medzera ${gap.toFixed(1)}% naznačuje, že model sa príliš prispôsobil trénovacím dátam. Skús znížiť C alebo použiť RBF jadro s menším γ.`;
+  else if(gap>8) interp=`<strong style="color:var(--c3);">Mierne preučenie</strong> — medzera ${gap.toFixed(1)}%. Model sa stále učí zo vzoriek, pridanie dát by mohlo pomôcť.`;
+  else if(lastTest<70) interp=`<strong style="color:var(--c2);">Underfitting</strong> — obe krivky sú nízko (test: ${lastTest.toFixed(1)}%). Model je príliš jednoduchý pre tieto dáta. Skús zložitejšie jadro.`;
+  else interp=`<strong style="color:var(--success);">Dobrá generalizácia</strong> — medzera len ${gap.toFixed(1)}%, test accuracy ${lastTest.toFixed(1)}%. Model sa dobre učí a zovšeobecňuje.`;
+
+  document.getElementById('lcInterpret').style.display='block';
+  document.getElementById('lcInterpretText').innerHTML=interp;
+}
+
+// ─── GRID SEARCH ──────────────────────────────────────────────────────────────
+function runGridSearch(){
+  const dsType=document.getElementById('gsDataset').value;
+  const{X,y}=getDataset(dsType);
+  const Cvals=[0.1,0.5,1,5,10,50];
+  const gvals=[0.05,0.1,0.5,1,5,10];
+  const results=[];
+  let bestAcc=0,bestC=1,bestG=0.5;
+  for(const C of Cvals){
+    const row=[];
+    for(const g of gvals){
+      const cv=kFoldCV(X,y,3,'rbf',C,g);
+      row.push(cv.avgAcc);
+      if(cv.avgAcc>bestAcc){bestAcc=cv.avgAcc;bestC=C;bestG=g;}
+    }
+    results.push(row);
+  }
+  document.getElementById('gridSearchResult').style.display='block';
+  document.getElementById('gsBestAcc').textContent=(bestAcc*100).toFixed(1)+'%';
+  document.getElementById('gsBestC').textContent=bestC;
+  document.getElementById('gsBestGamma').textContent=bestG;
+
+  // Render heatmap
+  const con=document.getElementById('heatmapContainer');
+  const cellSize=42;
+  let html=`<div style="font-size:0.72rem;color:var(--text2);margin-bottom:6px;">Riadky: C | Stĺpce: γ</div>`;
+  html+=`<div style="display:grid;grid-template-columns:auto repeat(${gvals.length},${cellSize}px);gap:2px;">`;
+  html+=`<div style="font-size:0.7rem;color:var(--text3);display:flex;align-items:flex-end;padding-bottom:4px;padding-right:6px;">C \\ γ</div>`;
+  for(const g of gvals) html+=`<div style="font-size:0.65rem;color:var(--text2);text-align:center;padding-bottom:4px;">${g}</div>`;
+  for(let i=0;i<Cvals.length;i++){
+    html+=`<div style="font-size:0.7rem;color:var(--text2);display:flex;align-items:center;padding-right:6px;">${Cvals[i]}</div>`;
+    for(let j=0;j<gvals.length;j++){
+      const v=results[i][j];
+      const t=(v-0.5)/0.5;
+      // Map to warm palette: low=dark, mid=c1/pink, high=c3/orange, max=c4/yellow
+      let bg;
+      if(t<0.33) bg=`rgba(199,56,102,${t*3*0.7})`;
+      else if(t<0.67) bg=`rgba(253,143,82,${(t-0.33)/0.34*0.8+0.15})`;
+      else bg=`rgba(255,189,113,${(t-0.67)/0.33*0.6+0.4})`;
+      const isB=v===bestAcc;
+      html+=`<div style="width:${cellSize}px;height:${cellSize}px;background:${bg};border:${isB?'2px solid #FFDCA2':'1px solid var(--border)'};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-family:'JetBrains Mono',monospace;color:${t>0.5?'#1a0a00':'var(--text2)'};">${(v*100).toFixed(0)}%</div>`;
+    }
+  }
+  html+=`</div>`;
+  con.innerHTML=html;
+}
+
+// ─── ALGORITHM COMPARISON ─────────────────────────────────────────────────────
+function knnPredict(Xtrain,ytrain,x,k=5){
+  return Xtrain.map((xi,i)=>({d:xi.reduce((s,v,j)=>s+(v-x[j])**2,0),l:ytrain[i]})).sort((a,b)=>a.d-b.d).slice(0,k).reduce((s,d)=>s+d.l,0)>0?1:-1;
+}
+function trainLR(Xtrain,ytrain,epochs=150){
+  const d=Xtrain[0].length,w=new Array(d).fill(0);let b=0;
+  const yt=ytrain.map(v=>v===1?1:0);
+  for(let e=0;e<epochs;e++) for(let i=0;i<Xtrain.length;i++){
+    const z=Xtrain[i].reduce((s,v,j)=>s+v*w[j],0)+b;
+    const p=1/(1+Math.exp(-z)),err=p-yt[i];
+    for(let j=0;j<d;j++) w[j]-=0.1*err*Xtrain[i][j];
+    b-=0.1*err;
+  }
+  return x=>{const z=x.reduce((s,v,j)=>s+v*w[j],0)+b;return 1/(1+Math.exp(-z))>0.5?1:-1;};
+}
+function trainDT(Xtrain,ytrain,depth=5){
+  function build(X,y,d){
+    if(d===0||y.every(v=>v===y[0])||X.length<4) return{leaf:true,label:y.reduce((s,v)=>s+v,0)>0?1:-1};
+    let bg=Infinity,bf=0,bt=0;
+    for(let f=0;f<X[0].length;f++){
+      const vals=[...new Set(X.map(x=>x[f]))].sort((a,b)=>a-b);
+      for(let v=0;v<vals.length-1;v++){
+        const th=(vals[v]+vals[v+1])/2,lY=[],rY=[];
+        for(let i=0;i<X.length;i++) (X[i][f]<=th?lY:rY).push(y[i]);
+        if(!lY.length||!rY.length) continue;
+        const gL=1-(lY.filter(v=>v===1).length/lY.length)**2-(lY.filter(v=>v===-1).length/lY.length)**2;
+        const gR=1-(rY.filter(v=>v===1).length/rY.length)**2-(rY.filter(v=>v===-1).length/rY.length)**2;
+        const g=(lY.length*gL+rY.length*gR)/y.length;
+        if(g<bg){bg=g;bf=f;bt=th;}
+      }
+    }
+    const lX=[],rX=[],lY=[],rY=[];
+    for(let i=0;i<X.length;i++) (X[i][bf]<=bt?[lX,lY]:[rX,rY]).forEach((arr,k)=>arr.push(k===0?X[i]:y[i]));
+    if(!lX.length||!rX.length) return{leaf:true,label:y.reduce((s,v)=>s+v,0)>0?1:-1};
+    return{leaf:false,feat:bf,thresh:bt,left:build(lX,lY,d-1),right:build(rX,rY,d-1)};
+  }
+  function pred(t,x){return t.leaf?t.label:x[t.feat]<=t.thresh?pred(t.left,x):pred(t.right,x);}
+  const tree=build(Xtrain,ytrain,depth);
+  return x=>pred(tree,x);
+}
+
+let cmpBarChartInst=null;
+function runComparison(){
+  const dsType=document.getElementById('cmpDataset').value;
+  const{X,y}=generateDataset(dsType,100);
+  const results=[];
+
+  function cvFor(name,trainFn,predictFn){
+    const n=X.length,k=5,idx=shuffle([...Array(n).keys()]);
+    const foldSize=Math.floor(n/k);
+    const accs=[],f1s=[];
+    let t0=performance.now();
+    for(let f=0;f<k;f++){
+      const testIdx=idx.slice(f*foldSize,(f+1)*foldSize);
+      const trainIdx=idx.filter((_,i)=>i<f*foldSize||i>=(f+1)*foldSize);
+      const Xtr=trainIdx.map(i=>X[i]),ytr=trainIdx.map(i=>y[i]);
+      const Xte=testIdx.map(i=>X[i]),yte=testIdx.map(i=>y[i]);
+      const model=trainFn(Xtr,ytr);
+      const yp=Xte.map(x=>predictFn(model,x));
+      const m=computeMetrics(yte,yp);
+      accs.push(m.acc);
+      f1s.push(m.f1);
+    }
+    const avg=accs.reduce((s,v)=>s+v,0)/k;
+    const std=Math.sqrt(accs.reduce((s,v)=>s+(v-avg)**2,0)/k);
+    const avgF1=f1s.reduce((s,v)=>s+v,0)/k;
+    return{name,avg,std,avgF1,time:performance.now()-t0};
+  }
+
+  results.push(cvFor('SVM (RBF)',
+    (Xtr,ytr)=>{const s=new SVM('rbf',1,0.5);s.train(Xtr,ytr);return s;},
+    (m,x)=>m.predict(x)>0?1:-1
+  ));
+  results.push(cvFor('SVM (lineárne)',
+    (Xtr,ytr)=>{const s=new SVM('linear',1);s.train(Xtr,ytr);return s;},
+    (m,x)=>m.predict(x)>0?1:-1
+  ));
+  results.push(cvFor('k-NN (k=5)',
+    (Xtr,ytr)=>({Xtr,ytr}),
+    (m,x)=>knnPredict(m.Xtr,m.ytr,x,5)
+  ));
+  results.push(cvFor('Logistická regresia',
+    (Xtr,ytr)=>trainLR(Xtr,ytr),
+    (fn,x)=>fn(x)
+  ));
+  results.push(cvFor('Rozhodovací strom',
+    (Xtr,ytr)=>trainDT(Xtr,ytr),
+    (fn,x)=>fn(x)
+  ));
+
+  document.getElementById('cmpResults').style.display='block';
+  const colors=['#FD8F52','#C73866','#FE676E','#FFBD71','#FFDCA2'];
+
+  if(cmpBarChartInst) cmpBarChartInst.destroy();
+  cmpBarChartInst=new Chart(document.getElementById('cmpBarChart'),{
+    type:'bar',
+    data:{labels:results.map(r=>r.name),datasets:[{label:'Accuracy (%)',data:results.map(r=>(r.avg*100).toFixed(1)),backgroundColor:colors,borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#6b5a50'},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#a89888',font:{size:11}},grid:{display:false}}},plugins:{legend:{display:false}}}
+  });
+
+  // Decision boundary viz for 2D datasets
+  function drawBoundary(canvasId,predictFn){
+    const c=document.getElementById(canvasId);if(!c)return;
+    const cx=c.getContext('2d'),w=c.width,h=c.height;
+    cx.clearRect(0,0,w,h);
+    const step=5;
+    for(let px=0;px<w;px+=step)for(let py=0;py<h;py+=step){
+      const v=predictFn([px/w,py/h]);
+      cx.fillStyle=v===1?'rgba(255,189,113,0.22)':'rgba(254,103,110,0.22)';
+      cx.fillRect(px,py,step,step);
+    }
+    for(let i=0;i<X.length;i++){cx.beginPath();cx.arc(X[i][0]*w,X[i][1]*h,3.5,0,Math.PI*2);cx.fillStyle=y[i]===1?'#FFBD71':'#FE676E';cx.fill();}
+  }
+
+  const svm1=new SVM('rbf',1,0.5);svm1.train(X,y);
+  drawBoundary('cmpViz1',x=>svm1.predict(x)>0?1:-1);
+  drawBoundary('cmpViz2',x=>knnPredict(X,y,x,5));
+  const lrFn=trainLR(X,y);
+  drawBoundary('cmpViz3',x=>lrFn(x));
+  const dtFn=trainDT(X,y);
+  drawBoundary('cmpViz4',x=>dtFn(x));
+
+  const tbody=document.querySelector('#cmpTable tbody');
+  tbody.innerHTML=results.map((r,i)=>`<tr>
+    <td style="font-weight:600;color:${colors[i]}">${r.name}</td>
+    <td style="color:${r.avg>0.85?'var(--success)':r.avg>0.7?'var(--c3)':'var(--danger)'}">${(r.avg*100).toFixed(1)}%</td>
+    <td>±${(r.std*100).toFixed(1)}%</td>
+    <td>${(r.avgF1*100).toFixed(1)}%</td>
+    <td>${r.time.toFixed(1)}</td>
+  </tr>`).join('');
+}
+
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+function showTab(id){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
+  const tab=document.getElementById('tab-'+id);
+  tab.classList.add('active');tab.classList.remove('anim-in');void tab.offsetWidth;tab.classList.add('anim-in');
+  event.target.classList.add('active');
+  if(id==='jadra' && !kernelCompDone){ genKernelComparison('moons'); kernelCompDone=true; }
+}
+let kernelCompDone=false;
+drawCanvas();
+</script>
+</body>
+</html>
