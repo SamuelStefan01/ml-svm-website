@@ -84,6 +84,8 @@
   \vspace{0.8cm}
   {\large Autor: Samuel Štefán\par}
   \vspace{0.3cm}
+  {\large Stránka: \url{https://samuelstefan01.github.io/ml-svm-website}\par}
+  \vspace{0.3cm}
   {\small Repozitár: \url{https://github.com/SamuelStefan01/ml-svm-website}\par}
   \vfill
   \rule{\linewidth}{0.5pt}\\[0.4em]
@@ -104,10 +106,10 @@ Aplikácia pokrýva teoretický základ, matematickú formuláciu, vizualizáciu
 rozhodovacej hranice, vyhodnotenie metrík efektívnosti a porovnanie s~inými
 klasifikačnými algoritmami.
 
-Projekt je implementovaný ako~jediný HTML súbor (\texttt{svm\_v4.html})
+Projekt je implementovaný ako~jediný HTML súbor (\texttt{index.html})
 bez externých závislostí okrem knižnice Chart.js (verzia 4.4.1, načítaná z~CDN).
 Algoritmus SMO (Sequential Minimal Optimization) je napísaný od základov
-v~JavaScripte bez použitia externých strojového učenia knižníc.
+v~JavaScripte bez použitia externých knižníc strojového učenia.
 
 \subsection*{Štruktúra aplikácie}
 
@@ -371,7 +373,7 @@ nepravé pozitívy (FP) červenou a~nepravé negatívy (FN) ružovou.
 Na~spoľahlivé vyhodnotenie výkonnosti modelu sa používa
 \textbf{$k$-násobná krížová validácia} ($k$-fold cross-validation).
 Dataset sa rozdelí na~$k$ podmnožín (foldov); model sa $k$-krát
-natrénuje na~$k-1$ foldoch a~testuje na~zostávajúcom foldze.
+natrénuje na~$k-1$ foldoch a~testuje na~zostávajúcom folde.
 Výsledná metrika je priemer a~smerodajná odchýlka:
 \begin{equation}
   \bar{A} = \frac{1}{k}\sum_{f=1}^{k} A_f,
@@ -421,7 +423,7 @@ Umožňuje diagnostikovať:
     pri~vysokej testovacej presnosti
 \end{itemize}
 Aplikácia automaticky vyhodnotí medzeru a~zobrazí textové odporúčanie
-(napr.\ znížiť $C$ pri pretrénovatí).
+(napr.\ znížiť $C$ pri pretrénovaní).
 
 % =============================================================================
 \section{Popis funkcionality aplikácie}
@@ -475,8 +477,8 @@ Pre~\textbf{lineárne jadro} sa po tréningu zobrazuje sekcia
 
 \subsection{Porovnanie algoritmov}
 
-Záložka \emph{Porovnanie modelov} vyhodnocuje 5 algoritmov pomocou
-5-násobnej krížovej validácie na~syntetickom datasete podľa výberu.
+Záložka \emph{Porovnanie modelov} vyhodnocuje 4 algoritmy pomocou
+4-násobnej krížovej validácie na~syntetickom datasete podľa výberu.
 Výsledky sú prezentované ako:
 \begin{itemize}
   \item vodorovný stĺpcový graf presnosti s~farebne odlíšenými stĺpcami,
@@ -510,8 +512,8 @@ Výsledky sú prezentované ako:
 
 \subsection{Architektúra kódu}
 
-Celý kód je uložený v~jedinom súbore bez externých závislostí
-na~strojového učenia knižniciach. Hlavné triedy a funkcie:
+Celý kód je uložený v jedinom súbore bez externých závislostí
+na knižniciach strojového učenia. Hlavné triedy a funkcie:
 
 \begin{description}
   \item[\texttt{class SVM}] Implementácia SVM s~voliteľným jadrom.
@@ -583,9 +585,4 @@ z~experimentov:
 \bibitem{uci}
   D.~Dua, C.~Graff,
   \textit{UCI Machine Learning Repository}.
-  University of California, Irvine, 2019.
-  \url{https://archive.ics.uci.edu}
-
-\end{thebibliography}
-
-\end{document}
+  University of California
